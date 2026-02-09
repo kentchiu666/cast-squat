@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Squat Jump - Cast Receiver</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #1a1a2e;
+            overflow: hidden;
+            font-family: 'Press Start 2P', cursive;
+        }
+        #gameCanvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+        }
+        #timerUi {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 24px;
+        }
+        #actionButton {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 20px 40px;
+            font-size: 24px;
+            font-family: 'Press Start 2P', cursive;
+            background-color: #e94560;
+            color: white;
+            border: none;
+            cursor: pointer;
+            image-rendering: pixelated;
+        }
+        #actionButton:hover {
+            background-color: #ff6b6b;
+        }
+        #actionButton:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui"></div>
+    <div id="timerUi"></div>
+    <button id="actionButton">LOADING...</button>
+
+    <!-- Google Cast SDK -->
+    <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+
+    <!-- 遊戲主程式 (ES6 模組) -->
+    <script type="module">
+        import { initGame, startGameLoop, handleCastMessage, addPlayer, removePlayer, getPlayers } from './js/game.js';
+
+        // 初始化 Canvas 和精靈圖
+        const canvas = document.getElementById('gameCanvas');
+        const spritesheet = new Image();
+        spritesheet.src = 'kenney_shape-characters/Spritesheet/spritesheet_default.png';
+
+        // 素材載入後初始化遊戲
+        spritesheet.onload = () => {
+            initGame(canvas, spritesheet);
+            startGameLoop();
+            console.log('遊戲已初始化');
+        };
+
+        // 匯出到全域供 Console 測試使用
+        window.gameAPI = {
+            addPlayer,
+            removePlayer,
+            getPlayers,
+            handleCastMessage
+        };
+
+        // Google Cast 整合
+        if (typeof cast !== 'undefined' && cast.framework) {
+            const context = cast.framework.CastReceiverContext.getInstance();
+            const CAST_NAMESPACE = 'urn:x-cast:com.example.castsquat';
+
+            context.addCustomMessageListener(CAST_NAMESPACE, (event) => {
+                console.log('收到 Cast 訊息:', event.data);
+
+                // 支援多種訊息格式
+                if (event.data) {
+                    // 新格式：{ action, playerId, playerName }
+                    // 舊格式：{ action: 'SQUAT_JUMP' }
+                    handleCastMessage(event.data);
+                }
+            });
+
+            context.start();
+            console.log('Cast Receiver 已啟動');
+        } else {
+            console.log('本地測試模式 - Cast SDK 未載入');
+            console.log('可使用 window.gameAPI 測試多人功能：');
+            console.log('  gameAPI.addPlayer("p1", "Alice")');
+            console.log('  gameAPI.addPlayer("p2", "Bob")');
+            console.log('  gameAPI.getPlayers()');
+        }
+    </script>
+</body>
+</html>
