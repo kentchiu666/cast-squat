@@ -1,17 +1,14 @@
-import { GAME_DURATION, COUNTDOWN_CONFIG, SCENE_CONFIG, PLAYER_COLORS, MULTIPLAYER_CONFIG, SPRITES } from './constants.js';
-import { easeOutBack } from './utils.js';
+import { GAME_DURATION, SCENE_CONFIG, PLAYER_COLORS, MULTIPLAYER_CONFIG } from './constants.js';
 import { updateParticles, drawParticles, clearParticles } from './particles.js';
 import {
     updateJump,
     startJump,
-    canJump,
     resetCharacter,
     getCharacterState,
     drawCharacter,
     drawStaticCharacter,
     updatePlayerJump,
     drawPlayerCharacter,
-    drawPlayerPreview,
     drawPlayersStatic,
     initColoredSpritesheets
 } from './character.js';
@@ -29,7 +26,6 @@ import {
     addPlayer,
     removePlayer,
     getPlayers,
-    getPlayerById,
     resetPlayers,
     resetPlayersGameState,
     lockPlayers,
@@ -47,22 +43,33 @@ let timer = GAME_DURATION;
 let countdownInterval = null;
 let finalScore = 0;
 
-// === 開始倒數 ===
-let startCountdown = 3;
-let countdownAnimTimer = 0;
-
 // === 星空背景 ===
 let starfield = [];
 
 // === Canvas 和素材 ===
 let canvas, ctx, spritesheet;
 let imageLoaded = false;
-const CANVAS_SCALE = 0.5;  // Canvas 解析度縮放（0.5 = 減少 75% 像素量）
-let logicalWidth = 0;       // 邏輯寬度（程式碼座標系）
-let logicalHeight = 0;      // 邏輯高度（程式碼座標系）
+const CANVAS_SCALE = 0.5;
+let logicalWidth = 0;
+let logicalHeight = 0;
 
-// === UI 元素 ===
+// === DOM 元素參考 ===
 let uiDisplay, timerUi, actionButton;
+let startScreenEl, countdownNumEl, scoreBarEl, gameOverScreenEl, gameOverContentEl;
+let playerListEl, playerCountEl, waitingMsgEl, startHintEl, fpsEl;
+
+// === 倒數 setTimeout 追蹤 ===
+let countdownTimeouts = [];
+
+// === DOM 更新快取（避免無意義的 DOM 寫入）===
+let cachedPlayerCount = -1;
+let cachedUiText = '';
+let cachedTimerText = '';
+let cachedTimerValue = -1;
+
+// === FPS 計數器 ===
+let fpsFrameCount = 0;
+let fpsLastTime = 0;
 
 // === 初始化遊戲 ===
 export function initGame(canvasElement, spritesheetImage) {
@@ -71,14 +78,25 @@ export function initGame(canvasElement, spritesheetImage) {
     ctx.imageSmoothingEnabled = false;
     spritesheet = spritesheetImage;
 
+    // 取得 DOM 元素參考
     uiDisplay = document.getElementById('ui');
     timerUi = document.getElementById('timerUi');
     actionButton = document.getElementById('actionButton');
+    startScreenEl = document.getElementById('startScreen');
+    countdownNumEl = document.getElementById('countdownNum');
+    scoreBarEl = document.getElementById('scoreBar');
+    gameOverScreenEl = document.getElementById('gameOverScreen');
+    gameOverContentEl = document.getElementById('gameOverContent');
+    playerListEl = document.getElementById('playerList');
+    playerCountEl = document.getElementById('playerCount');
+    waitingMsgEl = document.getElementById('waitingMsg');
+    startHintEl = document.getElementById('startHint');
+    fpsEl = document.getElementById('fps');
 
     // 監聽按鈕
     actionButton.addEventListener('click', handleAction);
 
-    // Canvas 低解析度渲染 + CSS 拉伸（大幅減少 GPU 像素填充量）
+    // Canvas 低解析度渲染 + CSS 拉伸
     function resizeCanvas() {
         logicalWidth = window.innerWidth;
         logicalHeight = window.innerHeight;
@@ -92,27 +110,90 @@ export function initGame(canvasElement, spritesheetImage) {
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // 預渲染彩色精靈圖（消除每幀 ctx.filter）
+    // 預渲染彩色精靈圖
     initColoredSpritesheets(spritesheet);
 
-    // 等待素材載入
+    // 素材載入
     if (spritesheet.complete) {
         imageLoaded = true;
     } else {
-        spritesheet.onload = () => {
-            imageLoaded = true;
-        };
+        spritesheet.onload = () => { imageLoaded = true; };
     }
+
+    // 初始化 DOM 狀態
+    changeState('START_SCREEN');
 }
 
 // === 開始遊戲迴圈 ===
 export function startGameLoop() {
+    fpsLastTime = performance.now();
     requestAnimationFrame(draw);
 }
 
 // === 判斷是否為多人模式 ===
 function isMultiplayerMode() {
     return getPlayerCount() > 0;
+}
+
+// === 統一狀態切換（管理所有 DOM 顯示/隱藏）===
+function changeState(newState) {
+    gameState = newState;
+    clearCountdownTimeouts();
+
+    // 隱藏所有 DOM 覆蓋層
+    startScreenEl.style.display = 'none';
+    countdownNumEl.style.display = 'none';
+    countdownNumEl.classList.remove('pop');
+    scoreBarEl.style.display = 'none';
+    gameOverScreenEl.style.display = 'none';
+
+    switch (newState) {
+        case 'START_SCREEN':
+            startScreenEl.style.display = 'block';
+            actionButton.textContent = imageLoaded ? 'START GAME' : 'LOADING...';
+            uiDisplay.textContent = '';
+            timerUi.textContent = '';
+            cachedPlayerCount = -1;
+            cachedUiText = '';
+            cachedTimerText = '';
+            break;
+
+        case 'COUNTDOWN':
+            actionButton.textContent = 'GET READY!';
+            uiDisplay.textContent = '';
+            timerUi.textContent = '';
+            cachedUiText = '';
+            cachedTimerText = '';
+            break;
+
+        case 'PLAYING':
+            actionButton.textContent = 'JUMP!';
+            cachedTimerValue = -1;
+            cachedUiText = '';
+            cachedTimerText = '';
+            if (isMultiplayerMode()) {
+                scoreBarEl.style.display = 'block';
+                uiDisplay.textContent = '';
+                setupMultiplayerScoreDOM();
+            }
+            break;
+
+        case 'GAME_OVER':
+            gameOverScreenEl.style.display = 'block';
+            actionButton.textContent = 'RESTART';
+            uiDisplay.textContent = '';
+            timerUi.textContent = '';
+            cachedUiText = '';
+            cachedTimerText = '';
+            updateGameOverDOM();
+            break;
+    }
+}
+
+// === 清除倒數計時 setTimeout ===
+function clearCountdownTimeouts() {
+    countdownTimeouts.forEach(id => clearTimeout(id));
+    countdownTimeouts = [];
 }
 
 // === 處理使用者操作 ===
@@ -126,28 +207,23 @@ function handleAction() {
         case 'COUNTDOWN':
             break;
         case 'PLAYING':
-            // 單人模式：直接跳躍
-            // 多人模式：需要指定玩家 ID（由 Cast 訊息處理）
             if (!isMultiplayerMode()) {
                 triggerJump();
             }
             break;
         case 'GAME_OVER':
-            // 重置並回到開始畫面
             resetPlayers();
             unlockPlayers();
-            gameState = 'START_SCREEN';
+            changeState('START_SCREEN');
             break;
     }
 }
 
 // === 開始倒數 ===
 function startCountdownSequence() {
-    gameState = 'COUNTDOWN';
-    startCountdown = 3;
-    countdownAnimTimer = 0;
+    changeState('COUNTDOWN');
 
-    // 鎖定玩家列表（多人模式）
+    // 鎖定玩家列表
     if (isMultiplayerMode()) {
         lockPlayers();
         resetPlayersGameState();
@@ -160,11 +236,41 @@ function startCountdownSequence() {
     resetCharacter();
     clearParticles();
     resetEffects();
+
+    // 用 DOM + CSS 動畫 + setTimeout 顯示倒數
+    startDOMCountdown();
+}
+
+// === DOM 倒數動畫（CSS animation，不佔 Canvas 渲染時間）===
+function startDOMCountdown() {
+    const numbers = [
+        { text: '3', color: '#FF6B6B' },
+        { text: '2', color: '#FFE66D' },
+        { text: '1', color: '#4ECDC4' },
+        { text: 'GO!', color: '#95E86B' }
+    ];
+
+    numbers.forEach((item, i) => {
+        const tid = setTimeout(() => {
+            countdownNumEl.textContent = item.text;
+            countdownNumEl.style.color = item.color;
+            countdownNumEl.style.fontSize = item.text === 'GO!' ? '80px' : '120px';
+            countdownNumEl.classList.remove('pop');
+            void countdownNumEl.offsetWidth; // 強制 reflow 以重啟動畫
+            countdownNumEl.classList.add('pop');
+        }, i * 1000);
+        countdownTimeouts.push(tid);
+    });
+
+    const startTid = setTimeout(() => {
+        startGame();
+    }, 3500);
+    countdownTimeouts.push(startTid);
 }
 
 // === 開始遊戲 ===
 function startGame() {
-    gameState = 'PLAYING';
+    changeState('PLAYING');
 
     if (countdownInterval) clearInterval(countdownInterval);
     countdownInterval = setInterval(() => {
@@ -173,7 +279,7 @@ function startGame() {
             clearInterval(countdownInterval);
             countdownInterval = null;
             finalScore = squatCount;
-            gameState = 'GAME_OVER';
+            changeState('GAME_OVER');
         }
     }, 1000);
 }
@@ -202,138 +308,103 @@ function draw() {
             drawPlayingScreen();
             break;
         case 'GAME_OVER':
-            drawGameOverScreen();
+            // Canvas: 只有星空（文字全由 DOM 處理）
             break;
     }
 
+    updateFPS();
     requestAnimationFrame(draw);
 }
 
-// === 繪製開始畫面（等候室）===
+// === 繪製開始畫面 ===
 function drawStartScreen() {
+    // 只在玩家數量改變時更新 DOM
+    const count = getPlayerCount();
+    if (count !== cachedPlayerCount) {
+        cachedPlayerCount = count;
+        updateStartScreenDOM();
+    }
+    // Canvas: 只有星空背景（已在主迴圈繪製）
+}
+
+// === 安全建立 DOM 元素的輔助函數 ===
+function createEl(tag, className, styles, text) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (styles) Object.assign(el.style, styles);
+    if (text) el.textContent = text;
+    return el;
+}
+
+// === 更新開始畫面 DOM（使用安全的 DOM 方法）===
+function updateStartScreenDOM() {
     const players = getPlayers();
-    const playerCount = getPlayerCount();
+    const count = players.length;
 
-    actionButton.innerText = imageLoaded ? "START GAME" : "LOADING...";
-    uiDisplay.innerText = "";
-    timerUi.innerText = "";
+    playerCountEl.textContent = `${count}/${MULTIPLAYER_CONFIG.MAX_PLAYERS} Players`;
 
-    ctx.fillStyle = 'white';
-    ctx.font = "48px 'Press Start 2P'";
-    ctx.textAlign = 'center';
+    // 清空並重建玩家列表
+    playerListEl.textContent = '';
 
-    // 標題
-    ctx.fillText("Squat Jump", logicalWidth / 2, 100);
+    if (count > 0) {
+        players.forEach(player => {
+            const color = PLAYER_COLORS[player.colorIndex].hex;
+            const entry = createEl('div', 'player-entry');
+            entry.appendChild(createEl('div', 'player-color-box', { background: color }));
+            entry.appendChild(createEl('span', 'player-name-text', { color: color }, player.name));
+            playerListEl.appendChild(entry);
+        });
+        waitingMsgEl.style.display = 'none';
+        startHintEl.style.display = 'block';
+    } else {
+        waitingMsgEl.style.display = 'block';
+        waitingMsgEl.textContent = '';
+        waitingMsgEl.appendChild(document.createTextNode('WAITING FOR PLAYERS...'));
+        const sub = createEl('span', 'sub', {}, '(Or click START for single player)');
+        waitingMsgEl.appendChild(sub);
+        startHintEl.style.display = 'none';
+    }
 
-    // 玩家計數
-    ctx.font = "20px 'Press Start 2P'";
-    ctx.fillStyle = '#888';
-    ctx.fillText(`${playerCount}/${MULTIPLAYER_CONFIG.MAX_PLAYERS} Players`, logicalWidth / 2, 160);
+    actionButton.textContent = imageLoaded ? 'START GAME' : 'LOADING...';
+}
+
+// === 繪製倒數畫面（Canvas 只畫場景，數字由 DOM 處理）===
+function drawCountdownScreen() {
+    drawFloor();
 
     if (imageLoaded) {
-        // 繪製玩家列表
-        if (playerCount > 0) {
-            const startY = 220;
-            const spacing = 80;
-
-            players.forEach((player, index) => {
-                const y = startY + index * spacing;
-
-                // 繪製角色預覽
-                drawPlayerPreview(ctx, spritesheet, player, logicalWidth / 2 - 120, y);
-
-                // 繪製玩家名稱（使用玩家顏色）
-                ctx.fillStyle = PLAYER_COLORS[player.colorIndex].hex;
-                ctx.font = "16px 'Press Start 2P'";
-                ctx.textAlign = 'left';
-                ctx.fillText(player.name, logicalWidth / 2 - 60, y + 8);
-                ctx.textAlign = 'center';
-            });
-
-            // 提示開始
-            ctx.fillStyle = '#95E86B';
-            ctx.font = "18px 'Press Start 2P'";
-            ctx.fillText("CLICK TO START", logicalWidth / 2, logicalHeight - 150);
+        if (isMultiplayerMode()) {
+            drawPlayersStatic(ctx, spritesheet, getPlayers(), logicalWidth, logicalHeight);
         } else {
-            // 等待玩家加入
-            ctx.fillStyle = '#888';
-            ctx.font = "18px 'Press Start 2P'";
-            ctx.fillText("WAITING FOR PLAYERS...", logicalWidth / 2, logicalHeight / 2);
-            ctx.font = "14px 'Press Start 2P'";
-            ctx.fillText("(Or click START for single player)", logicalWidth / 2, logicalHeight / 2 + 40);
+            drawStaticCharacter(ctx, spritesheet, logicalWidth, logicalHeight);
         }
     }
 }
 
-// === 繪製倒數畫面 ===
-function drawCountdownScreen() {
-    actionButton.innerText = "GET READY!";
-    uiDisplay.innerText = "";
-    timerUi.innerText = "";
+// === 建立多人分數 DOM 元素（進入 PLAYING 時呼叫一次）===
+function setupMultiplayerScoreDOM() {
+    const players = getPlayers();
+    scoreBarEl.textContent = '';
 
-    // 繪製場景
-    drawFloor();
+    players.forEach((player) => {
+        const entry = createEl('div', 'score-entry');
+        entry.appendChild(createEl('div', 'sname', { color: PLAYER_COLORS[player.colorIndex].hex }, player.name));
+        const valueEl = createEl('div', 'svalue', {}, '0');
+        entry.appendChild(valueEl);
+        scoreBarEl.appendChild(entry);
 
-    // 繪製靜止角色
-    if (imageLoaded) {
-        if (isMultiplayerMode()) {
-            // 多人模式：繪製所有玩家角色
-            drawPlayersStatic(ctx, spritesheet, getPlayers(), logicalWidth, logicalHeight);
-        } else {
-            // 單人模式：繪製單一角色
-            drawStaticCharacter(ctx, spritesheet, logicalWidth, logicalHeight);
-        }
-    }
-
-    // 更新倒數動畫計時器
-    countdownAnimTimer++;
-    const animProgress = countdownAnimTimer / COUNTDOWN_CONFIG.ANIM_DURATION;
-
-    // 繪製倒數數字
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    const scaleProgress = easeOutBack(Math.min(animProgress * 2, 1));
-    const baseScale = 1.5 - scaleProgress * 0.5;
-
-    const alpha = animProgress > 0.7 ? 1 - (animProgress - 0.7) / 0.3 : 1;
-    ctx.globalAlpha = alpha;
-
-    ctx.translate(logicalWidth / 2, logicalHeight / 2);
-    ctx.scale(baseScale, baseScale);
-
-    const displayText = startCountdown > 0 ? startCountdown.toString() : "GO!";
-    const fontSize = startCountdown > 0 ? 120 : 80;
-    ctx.font = `${fontSize}px 'Press Start 2P'`;
-
-    if (startCountdown === 3) ctx.fillStyle = '#FF6B6B';
-    else if (startCountdown === 2) ctx.fillStyle = '#FFE66D';
-    else if (startCountdown === 1) ctx.fillStyle = '#4ECDC4';
-    else ctx.fillStyle = '#95E86B';
-
-    ctx.fillText(displayText, 0, 0);
-    ctx.restore();
-
-    // 檢查是否進入下一個數字
-    if (countdownAnimTimer >= COUNTDOWN_CONFIG.ANIM_DURATION) {
-        countdownAnimTimer = 0;
-        startCountdown--;
-
-        if (startCountdown < 0) {
-            startGame();
-        }
-    }
+        // 儲存 DOM 參考，方便快速更新
+        player._scoreEl = valueEl;
+        player._cachedTotal = 0;
+    });
 }
 
 // === 繪製遊戲畫面 ===
 function drawPlayingScreen() {
-    actionButton.innerText = "JUMP!";
+    // DOM 分數更新（只在值改變時寫入 DOM）
+    updatePlayingScoresDOM();
 
     if (isMultiplayerMode()) {
-        uiDisplay.innerText = "";
-        timerUi.innerText = `TIME: ${timer}`;
-
         const players = getPlayers();
         const positions = getPlayerPositions(logicalWidth);
 
@@ -353,11 +424,7 @@ function drawPlayingScreen() {
         ctx.translate(screenShake.x, screenShake.y);
 
         drawFloor();
-
-        if (!imageLoaded) {
-            ctx.restore();
-            return;
-        }
+        if (!imageLoaded) { ctx.restore(); return; }
 
         drawSpeedLines(ctx);
         drawCoins(ctx, spritesheet);
@@ -369,12 +436,7 @@ function drawPlayingScreen() {
 
         drawParticles(ctx);
         ctx.restore();
-
-        drawPlayerScores(players);
     } else {
-        uiDisplay.innerText = `SQUATS: ${squatCount} | COINS: ${getCoinScore()}`;
-        timerUi.innerText = `TIME: ${timer}`;
-
         // 更新邏輯
         updateJump(logicalWidth, logicalHeight);
         const { characterY, squashStretch } = getCharacterState();
@@ -390,11 +452,7 @@ function drawPlayingScreen() {
         ctx.translate(screenShake.x, screenShake.y);
 
         drawFloor();
-
-        if (!imageLoaded) {
-            ctx.restore();
-            return;
-        }
+        if (!imageLoaded) { ctx.restore(); return; }
 
         drawSpeedLines(ctx);
         drawCoins(ctx, spritesheet);
@@ -406,84 +464,61 @@ function drawPlayingScreen() {
     }
 }
 
-// === 繪製各玩家分數（多人模式）===
-function drawPlayerScores(players) {
-    const spacing = logicalWidth / (players.length + 1);
-
-    ctx.font = "14px 'Press Start 2P'";
-    ctx.textAlign = 'center';
-
-    players.forEach((player, index) => {
-        const x = spacing * (index + 1);
-        const total = player.squatCount + player.coinScore;
-        const colorInfo = PLAYER_COLORS[player.colorIndex];
-
-        // 玩家名稱
-        ctx.fillStyle = colorInfo.hex;
-        ctx.fillText(player.name, x, 30);
-
-        // 分數
-        ctx.fillStyle = 'white';
-        ctx.fillText(`${total}`, x, 55);
-    });
+// === 更新遊戲中分數 DOM（只在值改變時寫入）===
+function updatePlayingScoresDOM() {
+    if (isMultiplayerMode()) {
+        const players = getPlayers();
+        players.forEach(player => {
+            const total = player.squatCount + player.coinScore;
+            if (player._cachedTotal !== total && player._scoreEl) {
+                player._cachedTotal = total;
+                player._scoreEl.textContent = total.toString();
+            }
+        });
+        if (timer !== cachedTimerValue) {
+            cachedTimerValue = timer;
+            timerUi.textContent = `TIME: ${timer}`;
+        }
+    } else {
+        const uiText = `SQUATS: ${squatCount} | COINS: ${getCoinScore()}`;
+        if (uiText !== cachedUiText) {
+            cachedUiText = uiText;
+            uiDisplay.textContent = uiText;
+        }
+        const timerText = `TIME: ${timer}`;
+        if (timerText !== cachedTimerText) {
+            cachedTimerText = timerText;
+            timerUi.textContent = timerText;
+        }
+    }
 }
 
-// === 繪製結束畫面 ===
-function drawGameOverScreen() {
-    actionButton.innerText = "RESTART";
-    uiDisplay.innerText = "";
-    timerUi.innerText = "";
-
-    ctx.fillStyle = 'white';
-    ctx.font = "48px 'Press Start 2P'";
-    ctx.textAlign = 'center';
-    ctx.fillText("GAME OVER!", logicalWidth / 2, 100);
+// === 更新遊戲結束 DOM（使用安全的 DOM 方法）===
+function updateGameOverDOM() {
+    gameOverContentEl.textContent = '';
 
     if (isMultiplayerMode()) {
-        // 多人模式：顯示排行榜
         const leaderboard = getLeaderboard();
         const medals = ['1st', '2nd', '3rd', '4th'];
+        const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32', '#888'];
 
-        ctx.font = "24px 'Press Start 2P'";
-        ctx.fillText("LEADERBOARD", logicalWidth / 2, 180);
+        gameOverContentEl.appendChild(createEl('div', 'leaderboard-title', {}, 'LEADERBOARD'));
 
         leaderboard.forEach((player, rank) => {
-            const y = 250 + rank * 70;
             const total = player.squatCount + player.coinScore;
-            const colorInfo = PLAYER_COLORS[player.colorIndex];
+            const color = PLAYER_COLORS[player.colorIndex].hex;
 
-            // 名次顏色
-            const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32', '#888'];
-            ctx.fillStyle = rankColors[rank] || '#888';
-            ctx.font = "18px 'Press Start 2P'";
-            ctx.textAlign = 'right';
-            ctx.fillText(medals[rank], logicalWidth / 2 - 120, y);
-
-            // 角色預覽
-            if (imageLoaded) {
-                drawPlayerPreview(ctx, spritesheet, player, logicalWidth / 2 - 80, y - 15);
-            }
-
-            // 玩家名稱
-            ctx.fillStyle = colorInfo.hex;
-            ctx.textAlign = 'left';
-            ctx.fillText(player.name, logicalWidth / 2 - 40, y);
-
-            // 分數
-            ctx.fillStyle = 'white';
-            ctx.textAlign = 'right';
-            ctx.fillText(`${total}`, logicalWidth / 2 + 150, y);
-
-            ctx.textAlign = 'center';
+            const entry = createEl('div', 'leaderboard-entry');
+            entry.appendChild(createEl('span', 'rank-medal', { color: rankColors[rank] }, medals[rank]));
+            entry.appendChild(createEl('div', 'player-color-box', { background: color }));
+            entry.appendChild(createEl('span', 'lb-name', { color: color }, player.name));
+            entry.appendChild(createEl('span', 'lb-score', {}, total.toString()));
+            gameOverContentEl.appendChild(entry);
         });
     } else {
-        // 單人模式：顯示分數
         const totalScore = finalScore + getCoinScore();
-        ctx.font = "32px 'Press Start 2P'";
-        ctx.fillText(`TOTAL: ${totalScore}`, logicalWidth / 2, logicalHeight / 2);
-
-        ctx.font = "18px 'Press Start 2P'";
-        ctx.fillText(`Squats: ${finalScore} + Coins: ${getCoinScore()}`, logicalWidth / 2, logicalHeight / 2 + 50);
+        gameOverContentEl.appendChild(createEl('div', 'single-result', {}, `TOTAL: ${totalScore}`));
+        gameOverContentEl.appendChild(createEl('div', 'single-detail', {}, `Squats: ${finalScore} + Coins: ${getCoinScore()}`));
     }
 }
 
@@ -526,27 +561,38 @@ function drawStarfield() {
     });
 }
 
+// === FPS 計數器 ===
+function updateFPS() {
+    fpsFrameCount++;
+    const now = performance.now();
+    if (now - fpsLastTime >= 1000) {
+        fpsEl.textContent = fpsFrameCount + ' FPS';
+        fpsFrameCount = 0;
+        fpsLastTime = now;
+    }
+}
+
 // === 匯出給 Google Cast 使用 ===
 export function handleCastMessage(data) {
-    // 相容舊格式
     if (data === 'SQUAT_JUMP') {
         handleAction();
         return;
     }
 
-    // 新格式：{ action, playerId, playerName }
     const { action, playerId, playerName } = data;
 
     switch (action) {
         case 'PLAYER_JOIN':
             if (gameState === 'START_SCREEN') {
                 addPlayer(playerId, playerName);
+                cachedPlayerCount = -1;
             }
             break;
 
         case 'PLAYER_LEAVE':
             if (gameState === 'START_SCREEN') {
                 removePlayer(playerId);
+                cachedPlayerCount = -1;
             }
             break;
 
@@ -566,7 +612,6 @@ export function handleCastMessage(data) {
             } else if (gameState === 'GAME_OVER') {
                 resetPlayers();
                 unlockPlayers();
-                gameState = 'START_SCREEN';
                 startCountdownSequence();
             }
             break;
@@ -577,5 +622,5 @@ export function getGameState() {
     return gameState;
 }
 
-// === 匯出玩家管理函數給外部使用（用於本地測試）===
+// === 匯出玩家管理函數 ===
 export { addPlayer, removePlayer, getPlayers } from './players.js';

@@ -21,6 +21,8 @@
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
+
+        /* === 既有 UI 元素 === */
         #ui {
             position: absolute;
             top: 20px;
@@ -48,6 +50,7 @@
             border: none;
             cursor: pointer;
             image-rendering: pixelated;
+            z-index: 20;
         }
         #actionButton:hover {
             background-color: #ff6b6b;
@@ -55,13 +58,206 @@
         #actionButton:active {
             transform: translateX(-50%) scale(0.95);
         }
+
+        /* === DOM 文字層（取代所有 Canvas fillText）=== */
+        #textLayer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        /* 開始畫面 */
+        #startScreen {
+            display: none;
+            width: 100%;
+            text-align: center;
+            padding-top: 60px;
+        }
+        #startScreen .title {
+            font-size: 48px;
+            color: white;
+        }
+        #playerCount {
+            font-size: 20px;
+            color: #888;
+            margin-top: 20px;
+        }
+        #playerList {
+            margin-top: 30px;
+        }
+        .player-entry {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .player-color-box {
+            width: 30px;
+            height: 30px;
+            flex-shrink: 0;
+        }
+        .player-name-text {
+            font-size: 16px;
+        }
+        #waitingMsg {
+            margin-top: 40px;
+            font-size: 18px;
+            color: #888;
+            line-height: 2;
+        }
+        #waitingMsg .sub {
+            font-size: 14px;
+            display: block;
+            margin-top: 10px;
+        }
+        #startHint {
+            display: none;
+            position: absolute;
+            bottom: 120px;
+            width: 100%;
+            text-align: center;
+            font-size: 18px;
+            color: #95E86B;
+        }
+
+        /* 倒數數字（CSS 動畫取代 Canvas 文字渲染）*/
+        #countdownNum {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 120px;
+            font-family: 'Press Start 2P', cursive;
+            z-index: 10;
+        }
+        #countdownNum.pop {
+            display: block;
+            animation: countdownPop 1s ease-out forwards;
+        }
+        @keyframes countdownPop {
+            0% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
+            60% { transform: translate(-50%, -50%) scale(0.97); opacity: 1; }
+            75% { transform: translate(-50%, -50%) scale(1.02); opacity: 1; }
+            85% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+        }
+
+        /* 多人分數欄 */
+        #scoreBar {
+            display: none;
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-family: 'Press Start 2P', cursive;
+        }
+        .score-entry {
+            display: inline-block;
+            margin: 0 20px;
+            text-align: center;
+        }
+        .score-entry .sname {
+            font-size: 14px;
+        }
+        .score-entry .svalue {
+            font-size: 14px;
+            color: white;
+            margin-top: 5px;
+        }
+
+        /* 遊戲結束畫面 */
+        #gameOverScreen {
+            display: none;
+            width: 100%;
+            text-align: center;
+            padding-top: 60px;
+        }
+        #gameOverScreen .title {
+            font-size: 48px;
+            color: white;
+        }
+        #gameOverContent {
+            margin-top: 40px;
+        }
+        .leaderboard-title {
+            font-size: 24px;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .leaderboard-entry {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+            font-size: 18px;
+        }
+        .rank-medal {
+            width: 70px;
+            text-align: right;
+        }
+        .lb-name {
+            width: 150px;
+            text-align: left;
+        }
+        .lb-score {
+            width: 60px;
+            text-align: right;
+            color: white;
+        }
+        .single-result {
+            font-size: 32px;
+            color: white;
+            margin-top: 60px;
+        }
+        .single-detail {
+            font-size: 18px;
+            color: white;
+            margin-top: 30px;
+        }
+
+        /* FPS 計數器 */
+        #fps {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            color: #0f0;
+            font-size: 12px;
+            font-family: monospace;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+
+    <!-- DOM 文字層（取代所有 Canvas fillText，大幅提升效能）-->
+    <div id="textLayer">
+        <div id="startScreen">
+            <div class="title">Squat Jump</div>
+            <div id="playerCount"></div>
+            <div id="playerList"></div>
+            <div id="waitingMsg"></div>
+            <div id="startHint">CLICK TO START</div>
+        </div>
+        <div id="countdownNum"></div>
+        <div id="scoreBar"></div>
+        <div id="gameOverScreen">
+            <div class="title">GAME OVER!</div>
+            <div id="gameOverContent"></div>
+        </div>
+    </div>
+
+    <!-- 既有 UI -->
     <div id="ui"></div>
     <div id="timerUi"></div>
     <button id="actionButton">LOADING...</button>
+    <div id="fps"></div>
 
     <!-- Google Cast SDK -->
     <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
