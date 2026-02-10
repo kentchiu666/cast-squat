@@ -22,7 +22,7 @@ export function createLandingParticles(canvasWidth, canvasHeight, playerX = null
     const centerX = playerX ?? canvasWidth / 2;
     const groundY = canvasHeight - SCENE_CONFIG.FLOOR_HEIGHT - SCENE_CONFIG.CHAR_FOOT_OFFSET;
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 6; i++) {
         const angle = (Math.PI / 6) + Math.random() * (Math.PI * 2 / 3);
         const speed = randomRange(3, 9);
         particles.push({
@@ -40,7 +40,7 @@ export function createLandingParticles(canvasWidth, canvasHeight, playerX = null
 
 // === 建立金幣收集粒子 ===
 export function createCoinCollectParticles(x, y, coinSize) {
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = randomRange(3, 8);
         particles.push({

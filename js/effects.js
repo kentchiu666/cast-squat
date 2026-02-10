@@ -55,14 +55,11 @@ export function drawAfterImages(ctx, spritesheet, canvasWidth, canvasHeight) {
         const charCenterX = img.playerX ?? canvasWidth / 2;
 
         ctx.save();
-        ctx.globalAlpha = img.alpha * 0.5;
+        ctx.globalAlpha = img.alpha * 0.4;
         ctx.translate(charCenterX, charRenderBottom - charRenderHeight / 2);
 
-        // 殘影用青色調
-        ctx.filter = 'hue-rotate(180deg) brightness(1.5)';
         ctx.drawImage(spritesheet, body.x, body.y, body.w, body.h,
             -charRenderWidth / 2, -charRenderHeight / 2, charRenderWidth, charRenderHeight);
-        ctx.filter = 'none';
 
         ctx.restore();
     });
@@ -74,7 +71,7 @@ export function createSpeedLines(canvasWidth, canvasHeight, playerX = null) {
     const centerX = playerX ?? canvasWidth / 2;
     const groundY = canvasHeight - SCENE_CONFIG.FLOOR_HEIGHT - SCENE_CONFIG.CHAR_FOOT_OFFSET;
 
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 4; i++) {
         speedLines.push({
             x: centerX + randomRange(-30, 30),
             y: groundY - randomRange(0, 30),

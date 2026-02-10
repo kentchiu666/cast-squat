@@ -74,6 +74,15 @@ export function initGame(canvasElement, spritesheetImage) {
     // 監聽按鈕
     actionButton.addEventListener('click', handleAction);
 
+    // Canvas 只在視窗大小改變時調整（避免每幀重建）
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        ctx.imageSmoothingEnabled = false;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
     // 等待素材載入
     if (spritesheet.complete) {
         imageLoaded = true;
@@ -166,10 +175,6 @@ function triggerJump() {
 
 // === 主繪製迴圈 ===
 function draw() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    ctx.imageSmoothingEnabled = false;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     drawStarfield();
@@ -494,12 +499,15 @@ function drawFloor() {
 // === 星空背景 ===
 function setupStarfield() {
     starfield = [];
-    for (let i = 0; i < 100; i++) {
+    const alphaLevels = ['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.7)'];
+    for (let i = 0; i < 40; i++) {
+        const size = Math.random() * 2 + 1;
         starfield.push({
             x: Math.random() * window.innerWidth,
             y: Math.random() * window.innerHeight,
-            size: Math.random() * 2 + 1,
-            speed: Math.random() * 0.5 + 0.1
+            size: size,
+            speed: Math.random() * 0.5 + 0.1,
+            color: alphaLevels[Math.min(Math.floor(size), 2)]
         });
     }
 }
@@ -513,7 +521,7 @@ function drawStarfield() {
             star.x = canvas.width;
             star.y = Math.random() * canvas.height;
         }
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + star.size * 0.2})`;
+        ctx.fillStyle = star.color;
         ctx.fillRect(Math.floor(star.x), Math.floor(star.y), star.size, star.size);
     });
 }
@@ -554,6 +562,11 @@ export function handleCastMessage(data) {
 
         case 'START_GAME':
             if (gameState === 'START_SCREEN') {
+                startCountdownSequence();
+            } else if (gameState === 'GAME_OVER') {
+                resetPlayers();
+                unlockPlayers();
+                gameState = 'START_SCREEN';
                 startCountdownSequence();
             }
             break;
