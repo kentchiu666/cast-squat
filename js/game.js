@@ -71,6 +71,11 @@ let cachedTimerValue = -1;
 let fpsFrameCount = 0;
 let fpsLastTime = 0;
 
+// === Fixed Timestep（確保遊戲速度不受幀率影響）===
+const TICK_MS = 1000 / 60;  // 邏輯 tick 固定 60fps (16.67ms)
+let lastFrameTime = 0;
+let tickAccumulator = 0;
+
 // === 初始化遊戲 ===
 export function initGame(canvasElement, spritesheetImage) {
     canvas = canvasElement;
@@ -127,7 +132,9 @@ export function initGame(canvasElement, spritesheetImage) {
 // === 開始遊戲迴圈 ===
 export function startGameLoop() {
     fpsLastTime = performance.now();
-    requestAnimationFrame(draw);
+    lastFrameTime = 0;
+    tickAccumulator = 0;
+    requestAnimationFrame(gameLoop);
 }
 
 // === 判斷是否為多人模式 ===
@@ -291,11 +298,42 @@ function triggerJump() {
     }
 }
 
-// === 主繪製迴圈 ===
-function draw() {
+// === 主迴圈（Fixed Timestep：物理固定 60tick/s，渲染隨裝置幀率）===
+function gameLoop(timestamp) {
+    if (lastFrameTime === 0) lastFrameTime = timestamp;
+    const dt = Math.min(timestamp - lastFrameTime, 100); // 上限 100ms 防止螺旋
+    lastFrameTime = timestamp;
+
+    // 累積時間，跑足夠次數的物理 tick（30fps 裝置每幀跑 2 次 tick）
+    tickAccumulator += dt;
+    while (tickAccumulator >= TICK_MS) {
+        tick();
+        tickAccumulator -= TICK_MS;
+    }
+
+    // 渲染一次
+    render();
+
+    updateFPS();
+    requestAnimationFrame(gameLoop);
+}
+
+// === 物理 tick（固定 60 次/秒，不受實際幀率影響）===
+function tick() {
+    // 星空移動（所有狀態共用）
+    tickStarfield();
+
+    // PLAYING 狀態的遊戲邏輯
+    if (gameState === 'PLAYING') {
+        tickPlaying();
+    }
+}
+
+// === 渲染（每幀一次，頻率隨裝置）===
+function render() {
     ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
-    drawStarfield();
+    renderStarfield();
 
     switch (gameState) {
         case 'START_SCREEN':
@@ -305,15 +343,32 @@ function draw() {
             drawCountdownScreen();
             break;
         case 'PLAYING':
-            drawPlayingScreen();
+            renderPlayingScreen();
             break;
         case 'GAME_OVER':
             // Canvas: 只有星空（文字全由 DOM 處理）
             break;
     }
+}
 
-    updateFPS();
-    requestAnimationFrame(draw);
+// === PLAYING 狀態的物理 tick ===
+function tickPlaying() {
+    if (isMultiplayerMode()) {
+        const players = getPlayers();
+        const positions = getPlayerPositions(logicalWidth);
+        players.forEach((player, index) => {
+            updatePlayerJump(player, logicalWidth, logicalHeight, positions[index]);
+        });
+        updateCoinsMultiplayer(logicalWidth, logicalHeight, players, positions);
+    } else {
+        updateJump(logicalWidth, logicalHeight);
+        const { characterY, squashStretch } = getCharacterState();
+        updateCoins(logicalWidth, logicalHeight, characterY, squashStretch);
+    }
+    updateParticles();
+    updateAfterImages();
+    updateSpeedLines();
+    updateScreenShake();
 }
 
 // === 繪製開始畫面 ===
@@ -399,69 +454,33 @@ function setupMultiplayerScoreDOM() {
     });
 }
 
-// === 繪製遊戲畫面 ===
-function drawPlayingScreen() {
-    // DOM 分數更新（只在值改變時寫入 DOM）
+// === 渲染遊戲畫面（純繪製，物理已在 tickPlaying 處理）===
+function renderPlayingScreen() {
     updatePlayingScoresDOM();
+
+    const screenShake = getScreenShake();
+    ctx.save();
+    ctx.translate(screenShake.x, screenShake.y);
+
+    drawFloor();
+    if (!imageLoaded) { ctx.restore(); return; }
+
+    drawSpeedLines(ctx);
+    drawCoins(ctx, spritesheet);
+    drawAfterImages(ctx, spritesheet, logicalWidth, logicalHeight);
 
     if (isMultiplayerMode()) {
         const players = getPlayers();
         const positions = getPlayerPositions(logicalWidth);
-
-        // 更新邏輯
-        players.forEach((player, index) => {
-            updatePlayerJump(player, logicalWidth, logicalHeight, positions[index]);
-        });
-        updateCoinsMultiplayer(logicalWidth, logicalHeight, players, positions);
-        updateParticles();
-        updateAfterImages();
-        updateSpeedLines();
-        updateScreenShake();
-
-        // 渲染
-        const screenShake = getScreenShake();
-        ctx.save();
-        ctx.translate(screenShake.x, screenShake.y);
-
-        drawFloor();
-        if (!imageLoaded) { ctx.restore(); return; }
-
-        drawSpeedLines(ctx);
-        drawCoins(ctx, spritesheet);
-        drawAfterImages(ctx, spritesheet, logicalWidth, logicalHeight);
-
         players.forEach((player, index) => {
             drawPlayerCharacter(ctx, spritesheet, player, positions[index], logicalHeight);
         });
-
-        drawParticles(ctx);
-        ctx.restore();
     } else {
-        // 更新邏輯
-        updateJump(logicalWidth, logicalHeight);
-        const { characterY, squashStretch } = getCharacterState();
-        updateCoins(logicalWidth, logicalHeight, characterY, squashStretch);
-        updateParticles();
-        updateAfterImages();
-        updateSpeedLines();
-        updateScreenShake();
-
-        // 渲染
-        const screenShake = getScreenShake();
-        ctx.save();
-        ctx.translate(screenShake.x, screenShake.y);
-
-        drawFloor();
-        if (!imageLoaded) { ctx.restore(); return; }
-
-        drawSpeedLines(ctx);
-        drawCoins(ctx, spritesheet);
-        drawAfterImages(ctx, spritesheet, logicalWidth, logicalHeight);
         drawCharacter(ctx, spritesheet, logicalWidth, logicalHeight);
-        drawParticles(ctx);
-
-        ctx.restore();
     }
+
+    drawParticles(ctx);
+    ctx.restore();
 }
 
 // === 更新遊戲中分數 DOM（只在值改變時寫入）===
@@ -547,15 +566,19 @@ function setupStarfield() {
     }
 }
 
-function drawStarfield() {
+function tickStarfield() {
     if (starfield.length === 0) setupStarfield();
-
     starfield.forEach(star => {
         star.x -= star.speed;
         if (star.x < 0) {
             star.x = logicalWidth;
             star.y = Math.random() * logicalHeight;
         }
+    });
+}
+
+function renderStarfield() {
+    starfield.forEach(star => {
         ctx.fillStyle = star.color;
         ctx.fillRect(Math.floor(star.x), Math.floor(star.y), star.size, star.size);
     });

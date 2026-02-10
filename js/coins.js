@@ -47,6 +47,7 @@ function checkCoinCollision(coin, canvasWidth, canvasHeight, characterY, squashS
 
 // === 更新金幣 ===
 export function updateCoins(canvasWidth, canvasHeight, characterY, squashStretch) {
+    coinAnimFrame++;
     coinSpawnTimer++;
     if (coinSpawnTimer >= COIN_CONFIG.SPAWN_INTERVAL) {
         spawnCoin(canvasWidth, canvasHeight);
@@ -70,7 +71,6 @@ export function updateCoins(canvasWidth, canvasHeight, characterY, squashStretch
 // === 繪製金幣 ===
 export function drawCoins(ctx, spritesheet) {
     const coinSprite = SPRITES.COIN;
-    coinAnimFrame++;
     const halfSize = COIN_CONFIG.SIZE / 2;
 
     coins.forEach(coin => {
@@ -106,6 +106,7 @@ function checkCoinCollisionWithPlayer(coin, playerX, characterY, squashStretch, 
 
 // === 更新金幣（多玩家版本）===
 export function updateCoinsMultiplayer(canvasWidth, canvasHeight, players, playerPositions) {
+    coinAnimFrame++;
     coinSpawnTimer++;
     if (coinSpawnTimer >= COIN_CONFIG.SPAWN_INTERVAL) {
         spawnCoin(canvasWidth, canvasHeight);
