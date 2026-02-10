@@ -5,7 +5,7 @@
 這是一個以像素藝術風格為主題的 Google Cast 網頁接收器應用程式，用於「深蹲跳躍」遊戲。它利用 HTML、CSS 和原生 JavaScript (ES6 模組) 在支援 Cast 的顯示器（例如 Chromecast、智慧電視）上呈現遊戲的視覺效果和邏輯。
 
 ### 遊戲玩法
-- 在 10 秒計時內盡可能多跳躍並收集金幣
+- 在 20 秒計時內盡可能多跳躍並收集金幣
 - 每次跳躍 +1 分
 - 每個金幣 +3 分（金幣只會出現在高處，必須跳躍才能吃到）
 - 最終分數 = 跳躍次數 + 金幣分數
@@ -20,7 +20,8 @@
 ### 主要功能
 
 -   **Google Cast Web Receiver**：整合 Cast SDK 以便與傳送器應用程式通訊
--   **基於 Canvas 的渲染**：所有遊戲圖形都使用 HTML5 Canvas 繪製
+-   **基於 Canvas 的渲染**：遊戲圖形（精靈、粒子、背景）使用 HTML5 Canvas 繪製
+-   **DOM 文字渲染**：所有文字 UI（分數、倒數、排行榜）使用 DOM 元素 + CSS 動畫，不使用 Canvas fillText
 -   **像素藝術美學**：透過關閉 Canvas 上的圖像平滑處理和使用像素字體 (`Press Start 2P`) 強制執行
 -   **動態角色動畫**：
     - 7 階段跳躍狀態機（蓄力→上升→頂點停頓→下落→落地→恢復）
@@ -85,7 +86,7 @@ php -S localhost:8080
 ### 遊戲流程（單人模式）
 1. 遊戲載入後顯示 `START_SCREEN`
 2. 點擊「START GAME」進入 3-2-1 倒數
-3. 倒數結束後開始 10 秒遊戲
+3. 倒數結束後開始 20 秒遊戲
 4. 點擊「JUMP!」跳躍並收集金幣
 5. 時間結束顯示分數明細
 
@@ -141,14 +142,19 @@ php -S localhost:8080
 | 金幣粒子 | 從 10 個減少為 5 個 |
 | 速度線 | 從 8 條減少為 4 條 |
 | 星空背景 | 從 100 顆減少為 40 顆，預計算顏色字串 |
+| Fixed Timestep | 物理邏輯固定 60 tick/s，與實際幀率脫鉤，確保 30fps 裝置遊戲速度正確 |
+| DOM 文字渲染 | 所有文字改用 DOM 元素 + CSS 動畫，移除所有 `ctx.fillText()` 呼叫 |
+| 倒數動畫 | 3-2-1-GO! 改用 CSS `@keyframes` + `setTimeout`，不佔用 Canvas 渲染時間 |
 
-> **關鍵發現**：`canvas.width = window.innerWidth` 每幀執行會強制重建整個 Canvas buffer，這是 Chromecast 上最大的效能瓶頸。
+> **關鍵發現**：
+> - `canvas.width = window.innerWidth` 每幀執行會強制重建整個 Canvas buffer，這是 Chromecast 上最大的效能瓶頸。
+> - 所有物理邏輯若綁定幀數（每幀 +1），在 30fps 裝置上會等比例變慢。Fixed Timestep 解決此問題。
 
 ## 開發慣例
 
 *   **技術棧**：HTML5、CSS3、原生 JavaScript (ES6 模組)、Canvas API
 *   **模組化**：程式碼拆分為 7 個獨立模組，各司其職
-*   **遊戲迴圈**：使用 `requestAnimationFrame` 實現 60fps 流暢動畫
+*   **遊戲迴圈**：Fixed Timestep 架構 — 物理固定 60 tick/s，渲染隨裝置幀率（30fps 裝置每幀跑 2 次物理 tick）
 *   **資產管理**：使用 Kenney Shape Characters 免費素材包
 *   **像素藝術**：`ctx.imageSmoothingEnabled = false` + `image-rendering: pixelated`
 *   **字體**：`Press Start 2P`（Google Fonts）
@@ -160,7 +166,7 @@ php -S localhost:8080
 
 | 參數 | 預設值 | 說明 |
 |------|--------|------|
-| `GAME_DURATION` | 10 | 遊戲時長（秒）|
+| `GAME_DURATION` | 20 | 遊戲時長（秒）|
 | `COIN_CONFIG.SPAWN_INTERVAL` | 90 | 金幣生成間隔（幀數，約 1.5 秒）|
 | `COIN_CONFIG.SPEED` | 4 | 金幣移動速度 |
 | `COIN_CONFIG.SCORE` | 3 | 每個金幣得分 |

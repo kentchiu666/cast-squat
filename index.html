@@ -264,7 +264,7 @@
 
     <!-- 遊戲主程式 (ES6 模組) -->
     <script type="module">
-        import { initGame, startGameLoop, handleCastMessage, addPlayer, removePlayer, getPlayers } from './js/game.js';
+        import { initGame, startGameLoop, handleCastMessage, setBroadcastCallbacks, addPlayer, removePlayer, getPlayers } from './js/game.js';
 
         // 初始化 Canvas 和精靈圖
         const canvas = document.getElementById('gameCanvas');
@@ -290,21 +290,50 @@
         if (typeof cast !== 'undefined' && cast.framework) {
             const context = cast.framework.CastReceiverContext.getInstance();
             const CAST_NAMESPACE = 'urn:x-cast:com.example.castsquat';
+            const connectedSenders = new Set();
+
+            // 廣播給所有已連線的 Sender
+            function broadcastToSenders(data) {
+                connectedSenders.forEach(senderId => {
+                    try {
+                        context.sendCustomMessage(CAST_NAMESPACE, senderId, data);
+                    } catch (e) {
+                        console.warn('Broadcast failed, removing sender:', senderId, e);
+                        connectedSenders.delete(senderId);
+                    }
+                });
+            }
+
+            // 回覆給特定 Sender
+            function replyToSender(senderId, data) {
+                try {
+                    context.sendCustomMessage(CAST_NAMESPACE, senderId, data);
+                } catch (e) {
+                    console.warn('Reply failed, removing sender:', senderId, e);
+                    connectedSenders.delete(senderId);
+                }
+            }
+
+            // 註冊回傳 callbacks 給 game.js
+            setBroadcastCallbacks(broadcastToSenders, replyToSender);
 
             context.addCustomMessageListener(CAST_NAMESPACE, (event) => {
-                console.log('收到 Cast 訊息:', event.data);
+                console.log('收到 Cast 訊息:', event.data, 'from:', event.senderId);
+                connectedSenders.add(event.senderId);
 
-                // 支援多種訊息格式
                 if (event.data) {
-                    // 新格式：{ action, playerId, playerName }
-                    // 舊格式：{ action: 'SQUAT_JUMP' }
-                    handleCastMessage(event.data);
+                    handleCastMessage(event.data, event.senderId);
                 }
             });
 
             context.start();
-            console.log('Cast Receiver 已啟動');
+            console.log('Cast Receiver 已啟動（支援雙向通訊）');
         } else {
+            // 本地測試模式：broadcast/reply 輸出到 Console
+            setBroadcastCallbacks(
+                (data) => console.log('[Broadcast]', JSON.stringify(data)),
+                (senderId, data) => console.log(`[Reply to ${senderId}]`, JSON.stringify(data))
+            );
             console.log('本地測試模式 - Cast SDK 未載入');
             console.log('可使用 window.gameAPI 測試多人功能：');
             console.log('  gameAPI.addPlayer("p1", "Alice")');

@@ -26,6 +26,7 @@ import {
     addPlayer,
     removePlayer,
     getPlayers,
+    getPlayerById,
     resetPlayers,
     resetPlayersGameState,
     lockPlayers,
@@ -70,6 +71,15 @@ let cachedTimerValue = -1;
 // === FPS 計數器 ===
 let fpsFrameCount = 0;
 let fpsLastTime = 0;
+
+// === Receiver → Sender 回傳通訊 ===
+let _broadcastFn = null;  // (data) => void — 廣播給所有 Sender
+let _replyFn = null;      // (senderId, data) => void — 回覆特定 Sender
+
+export function setBroadcastCallbacks(broadcastFn, replyFn) {
+    _broadcastFn = broadcastFn;
+    _replyFn = replyFn;
+}
 
 // === Fixed Timestep（確保遊戲速度不受幀率影響）===
 const TICK_MS = 1000 / 60;  // 邏輯 tick 固定 60fps (16.67ms)
@@ -146,6 +156,11 @@ function isMultiplayerMode() {
 function changeState(newState) {
     gameState = newState;
     clearCountdownTimeouts();
+
+    // 廣播狀態給所有 Sender
+    if (_broadcastFn) {
+        _broadcastFn({ type: 'STATE_UPDATE', state: newState });
+    }
 
     // 隱藏所有 DOM 覆蓋層
     startScreenEl.style.display = 'none';
@@ -596,8 +611,39 @@ function updateFPS() {
     }
 }
 
+// === 處理玩家加入請求 ===
+function handlePlayerJoin(playerId, playerName, senderId) {
+    if (gameState !== 'START_SCREEN') {
+        replyTo(senderId, { type: 'JOIN_RESULT', success: false, reason: 'GAME_IN_PROGRESS' });
+        return;
+    }
+
+    // 冪等處理：重複加入視為成功
+    const existing = getPlayerById(playerId);
+    if (existing) {
+        replyTo(senderId, { type: 'JOIN_RESULT', success: true, colorIndex: existing.colorIndex });
+        return;
+    }
+
+    if (addPlayer(playerId, playerName)) {
+        const player = getPlayerById(playerId);
+        replyTo(senderId, { type: 'JOIN_RESULT', success: true, colorIndex: player.colorIndex });
+        replyTo(senderId, { type: 'STATE_UPDATE', state: gameState });
+        cachedPlayerCount = -1;
+    } else {
+        replyTo(senderId, { type: 'JOIN_RESULT', success: false, reason: 'ROOM_FULL' });
+    }
+}
+
+// === 回覆特定 Sender（安全封裝）===
+function replyTo(senderId, data) {
+    if (_replyFn && senderId) {
+        _replyFn(senderId, data);
+    }
+}
+
 // === 匯出給 Google Cast 使用 ===
-export function handleCastMessage(data) {
+export function handleCastMessage(data, senderId) {
     if (data === 'SQUAT_JUMP') {
         handleAction();
         return;
@@ -607,10 +653,7 @@ export function handleCastMessage(data) {
 
     switch (action) {
         case 'PLAYER_JOIN':
-            if (gameState === 'START_SCREEN') {
-                addPlayer(playerId, playerName);
-                cachedPlayerCount = -1;
-            }
+            handlePlayerJoin(playerId, playerName, senderId);
             break;
 
         case 'PLAYER_LEAVE':
@@ -634,9 +677,10 @@ export function handleCastMessage(data) {
             if (gameState === 'START_SCREEN') {
                 startCountdownSequence();
             } else if (gameState === 'GAME_OVER') {
+                // 回到等候室讓玩家重新加入，而非直接開始
                 resetPlayers();
                 unlockPlayers();
-                startCountdownSequence();
+                changeState('START_SCREEN');
             }
             break;
     }

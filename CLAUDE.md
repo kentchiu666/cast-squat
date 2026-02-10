@@ -11,7 +11,7 @@ This file provides guidance to Claude Code when working with this repository.
 這是一個 **Google Cast Web Receiver** 應用程式，用於「深蹲跳躍」像素藝術風格遊戲。遊戲在 Chromecast 或智慧電視上執行，使用者透過手機 (Sender App) 發送訊息來控制跳躍。
 
 ### 核心功能
-- 10 秒計時內計算跳躍次數並收集金幣
+- 20 秒計時內計算跳躍次數並收集金幣
 - 7 階段跳躍動畫（擠壓伸展、殘影、速度線、螢幕震動）
 - 金幣系統（從右側移動，跳躍收集 +3 分）
 - 3-2-1 開始倒數動畫
@@ -47,7 +47,8 @@ cast_squat/
 
 ## Technology Stack
 
-- **HTML5 Canvas** - 所有遊戲圖形渲染
+- **HTML5 Canvas** - 遊戲圖形渲染（精靈、粒子、背景）
+- **DOM + CSS Animation** - 所有文字 UI（分數、倒數、排行榜），不使用 Canvas fillText
 - **Vanilla JavaScript (ES6 模組)** - 遊戲邏輯，無框架依賴
 - **Google Cast Web Receiver SDK** - Cast 整合
 - **Press Start 2P Font** - 像素藝術字體（Google Fonts）
@@ -69,7 +70,7 @@ npx serve .
 
 ### Game State Machine
 ```
-START_SCREEN ──(點擊/START_GAME)──→ COUNTDOWN ──(3-2-1-GO!)──→ PLAYING ──(10秒)──→ GAME_OVER
+START_SCREEN ──(點擊/START_GAME)──→ COUNTDOWN ──(3-2-1-GO!)──→ PLAYING ──(20秒)──→ GAME_OVER
       ↑                                                                                │
       ├────────────────────────────(點擊重新開始)──────────────────────────────────────┘
       └────────────────────────────(Cast START_GAME → 重置玩家 → 直接倒數)──────────────┘
@@ -92,7 +93,45 @@ IDLE → ANTICIPATION → RISE → HANG → FALL → LAND → RECOVER → IDLE
 | `coins.js` | 金幣生成、移動、碰撞檢測、繪製、多人碰撞檢測 |
 | `effects.js` | 殘影系統、速度線、螢幕震動 |
 | `players.js` | 玩家列表管理、加入/離開/鎖定、跳躍觸發、排行榜 |
-| `game.js` | 遊戲狀態、主迴圈、UI 更新、Cast 訊息處理、多人模式整合 |
+| `game.js` | 遊戲狀態、Fixed Timestep 主迴圈、DOM UI 更新、Cast 訊息處理 |
+
+### Game Loop Architecture（Fixed Timestep）
+
+遊戲迴圈採用 Fixed Timestep 模式，確保物理邏輯在任何幀率下都以相同速度執行：
+
+```
+gameLoop(timestamp)
+├── 累積 delta time → tickAccumulator
+├── while (tickAccumulator >= TICK_MS)   ← 固定 60 tick/s
+│   └── tick()
+│       ├── tickStarfield()              ← 星空位移（所有狀態）
+│       └── tickPlaying()                ← PLAYING 狀態物理
+│           ├── updateJump / updatePlayerJump
+│           ├── updateCoins / updateCoinsMultiplayer
+│           ├── updateParticles
+│           ├── updateAfterImages
+│           ├── updateSpeedLines
+│           └── updateScreenShake
+└── render()                             ← 每幀一次，頻率隨裝置
+    ├── renderStarfield()
+    └── renderPlayingScreen()
+        ├── drawFloor, drawCoins, drawCharacter...
+        └── drawParticles
+```
+
+**關鍵原則**：30fps 裝置每幀跑 2 次 `tick()`，遊戲速度與 60fps 完全一致。
+
+### 文字渲染架構（DOM 取代 Canvas）
+
+所有文字由 DOM 元素渲染，Canvas 僅負責精靈和圖形：
+
+| DOM 元素 | 用途 | 更新時機 |
+|----------|------|----------|
+| `#startScreen` | 標題、玩家列表、等候訊息 | 玩家數量改變時 |
+| `#countdownNum` | 3-2-1-GO! 倒數 | CSS `@keyframes countdownPop` 動畫 |
+| `#scoreBar` | 多人分數欄 | 值改變時（快取比對）|
+| `#ui` / `#timerUi` | 單人分數和計時器 | 值改變時（快取比對）|
+| `#gameOverScreen` | 排行榜 / 單人結果 | 進入 GAME_OVER 時建立一次 |
 
 ### Key Exports
 
@@ -173,14 +212,15 @@ export { createLandingParticles, createCoinCollectParticles, updateParticles, dr
 1. 確認功能歸屬哪個模組
 2. 在 `constants.js` 新增相關配置
 3. 實作功能並 export 必要函數
-4. 在 `game.js` 整合到遊戲迴圈
+4. 在 `game.js` 整合：物理邏輯放 `tick()` 系列，繪製放 `render()` 系列
+5. 文字 UI 使用 DOM 元素（不要用 `ctx.fillText()`）
 
 ## Configuration (constants.js)
 
 ### 遊戲設定
 ```javascript
-GAME_DURATION = 10          // 遊戲時長（秒）
-COUNTDOWN_CONFIG.ANIM_DURATION = 60  // 倒數動畫時長（幀）
+GAME_DURATION = 20          // 遊戲時長（秒）
+// 倒數動畫由 DOM + CSS @keyframes 處理（setTimeout 控制節奏）
 ```
 
 ### 跳躍設定
