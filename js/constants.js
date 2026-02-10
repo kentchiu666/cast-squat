@@ -1,5 +1,5 @@
 // === 遊戲常數 ===
-export const GAME_DURATION = 10;
+export const GAME_DURATION = 20;
 
 // === 跳躍階段 ===
 export const JUMP_PHASE = {

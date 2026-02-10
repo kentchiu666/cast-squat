@@ -262,6 +262,7 @@ function startDOMCountdown() {
             countdownNumEl.textContent = item.text;
             countdownNumEl.style.color = item.color;
             countdownNumEl.style.fontSize = item.text === 'GO!' ? '80px' : '120px';
+            countdownNumEl.style.display = '';  // 清除 inline display，讓 CSS class 控制
             countdownNumEl.classList.remove('pop');
             void countdownNumEl.offsetWidth; // 強制 reflow 以重啟動畫
             countdownNumEl.classList.add('pop');
