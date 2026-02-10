@@ -3,6 +3,30 @@ import { easeOutBack } from './utils.js';
 import { createLandingParticles } from './particles.js';
 import { createSpeedLines, createAfterImage, triggerScreenShake } from './effects.js';
 
+// === 預渲染彩色精靈圖快取 ===
+const coloredSpritesheets = new Map();
+
+export function initColoredSpritesheets(spritesheet) {
+    coloredSpritesheets.clear();
+    // 紅色（hueRotation=0）直接用原圖
+    coloredSpritesheets.set(0, spritesheet);
+
+    PLAYER_COLORS.forEach((color, index) => {
+        if (color.hueRotation === 0) return;  // 紅色跳過
+        const offscreen = document.createElement('canvas');
+        offscreen.width = spritesheet.width;
+        offscreen.height = spritesheet.height;
+        const offCtx = offscreen.getContext('2d');
+        offCtx.filter = `hue-rotate(${color.hueRotation}deg)`;
+        offCtx.drawImage(spritesheet, 0, 0);
+        coloredSpritesheets.set(index, offscreen);
+    });
+}
+
+function getColoredSpritesheet(colorIndex) {
+    return coloredSpritesheets.get(colorIndex) || coloredSpritesheets.get(0);
+}
+
 // === 角色狀態 ===
 let jumpPhase = JUMP_PHASE.IDLE;
 let phaseTimer = 0;
@@ -229,18 +253,16 @@ export function drawHand(ctx, spritesheet, handSprite, x, y, angle, isLeft) {
     ctx.restore();
 }
 
-// === 繪製角色陰影 ===
+// === 繪製角色陰影（用 fillRect 取代 ellipse，節省效能）===
 export function drawCharacterShadow(ctx, x, y, height) {
     const shadowScale = Math.max(0.3, 1 - height / 400);
     const shadowWidth = 60 * shadowScale;
-    const shadowHeight = 12 * shadowScale;
+    const shadowHeight = 10 * shadowScale;
 
     ctx.save();
     ctx.globalAlpha = 0.3 * shadowScale;
     ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.ellipse(x, y, shadowWidth, shadowHeight, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(x - shadowWidth, y - shadowHeight / 2, shadowWidth * 2, shadowHeight);
     ctx.restore();
 }
 
@@ -456,8 +478,8 @@ export function updatePlayerJump(player, canvasWidth, canvasHeight, playerX) {
 // === 繪製玩家角色（多人版本，支援位置和顏色）===
 export function drawPlayerCharacter(ctx, spritesheet, player, playerX, canvasHeight) {
     const state = player.jumpState;
-    const colorInfo = PLAYER_COLORS[player.colorIndex];
     const { face: currentFace, hand: currentHand, handAngle } = getCharacterPartsForState(state);
+    const coloredSheet = getColoredSpritesheet(player.colorIndex);
     const body = SPRITES.BODY;
     const baseSize = SCENE_CONFIG.BASE_SIZE;
 
@@ -471,23 +493,14 @@ export function drawPlayerCharacter(ctx, spritesheet, player, playerX, canvasHei
     ctx.save();
     ctx.translate(playerX, charRenderBottom - charRenderHeight / 2);
 
-    // 套用顏色濾鏡
-    if (colorInfo.hueRotation !== 0) {
-        ctx.filter = `hue-rotate(${colorInfo.hueRotation}deg)`;
-    }
+    // 使用預渲染彩色精靈圖繪製手部和身體（無需 ctx.filter）
+    drawHand(ctx, coloredSheet, currentHand, -charRenderWidth / 2 - 15, 0, handAngle.left, true);
+    drawHand(ctx, coloredSheet, currentHand, charRenderWidth / 2 + 15, 0, handAngle.right, false);
 
-    // 繪製手部
-    drawHand(ctx, spritesheet, currentHand, -charRenderWidth / 2 - 15, 0, handAngle.left, true);
-    drawHand(ctx, spritesheet, currentHand, charRenderWidth / 2 + 15, 0, handAngle.right, false);
-
-    // 繪製身體
-    ctx.drawImage(spritesheet, body.x, body.y, body.w, body.h,
+    ctx.drawImage(coloredSheet, body.x, body.y, body.w, body.h,
         -charRenderWidth / 2, -charRenderHeight / 2, charRenderWidth, charRenderHeight);
 
-    // 重置濾鏡繪製臉部（臉部保持原色）
-    ctx.filter = 'none';
-
-    // 繪製臉部
+    // 臉部用原圖（保持原色）
     const faceSizeRatio = currentFace.w / currentFace.h;
     const faceHeight = 28;
     const faceWidth = faceHeight * faceSizeRatio;
@@ -499,7 +512,7 @@ export function drawPlayerCharacter(ctx, spritesheet, player, playerX, canvasHei
 
 // === 繪製玩家預覽（等候室用）===
 export function drawPlayerPreview(ctx, spritesheet, player, x, y) {
-    const colorInfo = PLAYER_COLORS[player.colorIndex];
+    const coloredSheet = getColoredSpritesheet(player.colorIndex);
     const body = SPRITES.BODY;
     const face = SPRITES.FACE_IDLE;
     const previewSize = MULTIPLAYER_CONFIG.PLAYER_PREVIEW_SIZE;
@@ -507,19 +520,11 @@ export function drawPlayerPreview(ctx, spritesheet, player, x, y) {
     ctx.save();
     ctx.translate(x, y);
 
-    // 套用顏色濾鏡
-    if (colorInfo.hueRotation !== 0) {
-        ctx.filter = `hue-rotate(${colorInfo.hueRotation}deg)`;
-    }
-
-    // 繪製身體
-    ctx.drawImage(spritesheet, body.x, body.y, body.w, body.h,
+    // 使用預渲染彩色精靈圖
+    ctx.drawImage(coloredSheet, body.x, body.y, body.w, body.h,
         -previewSize / 2, -previewSize / 2, previewSize, previewSize);
 
-    // 重置濾鏡繪製臉部
-    ctx.filter = 'none';
-
-    // 繪製臉部
+    // 臉部用原圖
     const faceSizeRatio = face.w / face.h;
     const faceHeight = previewSize * 0.35;
     const faceWidth = faceHeight * faceSizeRatio;
@@ -538,7 +543,7 @@ export function drawPlayersStatic(ctx, spritesheet, players, canvasWidth, canvas
 
     players.forEach((player, index) => {
         const playerX = spacing * (index + 1);
-        const colorInfo = PLAYER_COLORS[player.colorIndex];
+        const coloredSheet = getColoredSpritesheet(player.colorIndex);
         const body = SPRITES.BODY;
         const face = SPRITES.FACE_IDLE;
         const hand = SPRITES.HAND_CLOSED;
@@ -551,23 +556,14 @@ export function drawPlayersStatic(ctx, spritesheet, players, canvasWidth, canvas
         ctx.save();
         ctx.translate(playerX, charRenderBottom - baseSize / 2);
 
-        // 套用顏色濾鏡
-        if (colorInfo.hueRotation !== 0) {
-            ctx.filter = `hue-rotate(${colorInfo.hueRotation}deg)`;
-        }
+        // 使用預渲染彩色精靈圖
+        drawHand(ctx, coloredSheet, hand, -baseSize / 2 - 15, 0, 0.3, true);
+        drawHand(ctx, coloredSheet, hand, baseSize / 2 + 15, 0, -0.3, false);
 
-        // 繪製手部
-        drawHand(ctx, spritesheet, hand, -baseSize / 2 - 15, 0, 0.3, true);
-        drawHand(ctx, spritesheet, hand, baseSize / 2 + 15, 0, -0.3, false);
-
-        // 繪製身體
-        ctx.drawImage(spritesheet, body.x, body.y, body.w, body.h,
+        ctx.drawImage(coloredSheet, body.x, body.y, body.w, body.h,
             -baseSize / 2, -baseSize / 2, baseSize, baseSize);
 
-        // 重置濾鏡繪製臉部
-        ctx.filter = 'none';
-
-        // 繪製臉部
+        // 臉部用原圖
         const faceSizeRatio = face.w / face.h;
         const faceHeight = 28;
         const faceWidth = faceHeight * faceSizeRatio;

@@ -6,6 +6,7 @@ import { createCoinCollectParticles } from './particles.js';
 let coins = [];
 let coinScore = 0;
 let coinSpawnTimer = 0;
+let coinAnimFrame = 0;  // 用幀計數器取代 Date.now()
 
 // === 取得狀態 ===
 export function getCoinScore() {
@@ -16,6 +17,7 @@ export function resetCoins() {
     coins = [];
     coinScore = 0;
     coinSpawnTimer = 0;
+    coinAnimFrame = 0;
 }
 
 // === 生成金幣 ===
@@ -68,17 +70,20 @@ export function updateCoins(canvasWidth, canvasHeight, characterY, squashStretch
 // === 繪製金幣 ===
 export function drawCoins(ctx, spritesheet) {
     const coinSprite = SPRITES.COIN;
+    coinAnimFrame++;
+    const halfSize = COIN_CONFIG.SIZE / 2;
+
     coins.forEach(coin => {
         ctx.save();
-        ctx.translate(coin.x + COIN_CONFIG.SIZE / 2, coin.y + COIN_CONFIG.SIZE / 2);
+        ctx.translate(coin.x + halfSize, coin.y + halfSize);
 
-        // 簡單的縮放動畫模擬旋轉
-        const scale = Math.abs(Math.sin(Date.now() * 0.005 + coin.x * 0.1));
+        // 用幀計數器取代 Date.now()（避免每幀系統呼叫）
+        const scale = Math.abs(Math.sin(coinAnimFrame * 0.15 + coin.x * 0.1));
         ctx.scale(0.3 + scale * 0.7, 1);
 
         ctx.drawImage(spritesheet,
             coinSprite.x, coinSprite.y, coinSprite.w, coinSprite.h,
-            -COIN_CONFIG.SIZE / 2, -COIN_CONFIG.SIZE / 2,
+            -halfSize, -halfSize,
             COIN_CONFIG.SIZE, COIN_CONFIG.SIZE);
         ctx.restore();
     });

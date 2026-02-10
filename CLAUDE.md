@@ -18,7 +18,9 @@ This file provides guidance to Claude Code when working with this repository.
 - **多人等候室**：START_SCREEN 顯示已加入玩家（角色預覽 + 名稱）
 - **多人遊戲**：最多 4 人同時遊戲，各自獨立角色和計分
 - **排行榜**：遊戲結束顯示玩家排名
+- **Cast 重新開始**：GAME_OVER 狀態下發送 `START_GAME` 可重新開始
 - 支援本地瀏覽器測試與 Google Cast 部署
+- **已針對 Chromecast v3 低階設備優化效能**
 
 ## Project Structure
 
@@ -67,9 +69,10 @@ npx serve .
 
 ### Game State Machine
 ```
-START_SCREEN ──(點擊)──→ COUNTDOWN ──(3-2-1-GO!)──→ PLAYING ──(10秒)──→ GAME_OVER
-      ↑                                                                      │
-      └─────────────────────────(點擊重新開始)───────────────────────────────┘
+START_SCREEN ──(點擊/START_GAME)──→ COUNTDOWN ──(3-2-1-GO!)──→ PLAYING ──(10秒)──→ GAME_OVER
+      ↑                                                                                │
+      ├────────────────────────────(點擊重新開始)──────────────────────────────────────┘
+      └────────────────────────────(Cast START_GAME → 重置玩家 → 直接倒數)──────────────┘
 ```
 
 ### Jump Phase State Machine (character.js)
@@ -116,15 +119,35 @@ export { createLandingParticles, createCoinCollectParticles, updateParticles, dr
 ```
 
 ### Cast Integration
+- **Application ID**: `DD35BB50`
 - **Namespace**: `urn:x-cast:com.example.castsquat`
+- **Receiver URL**: `https://kentchiu666.github.io/cast-squat/`
 - **訊息格式**（多人）:
   - 玩家加入：`{ action: 'PLAYER_JOIN', playerId: 'xxx', playerName: 'Alice' }`
   - 玩家離開：`{ action: 'PLAYER_LEAVE', playerId: 'xxx' }`
   - 跳躍：`{ action: 'SQUAT_JUMP', playerId: 'xxx' }`
-  - 開始遊戲：`{ action: 'START_GAME' }`
+  - 開始/重新開始：`{ action: 'START_GAME' }`（在 START_SCREEN 或 GAME_OVER 狀態均有效）
 - **訊息格式**（舊版單人）：`{ action: 'SQUAT_JUMP' }` 或 `'SQUAT_JUMP'`
+- **重新開始行為**：GAME_OVER 時收到 `START_GAME` → 重置玩家 → 回到 START_SCREEN → 立即開始倒數
 - 無 Cast SDK 時自動降級為本地測試模式
 - 第一個加入的玩家獲得紅色角色（colorIndex = 0）
+
+### Sender App（Flutter）
+- 獨立專案 `cast_squat_sender/`，使用 **官方 Google Cast SDK**
+- 透過 **Method Channel** (`com.example.castsquat/cast`) 橋接 Flutter ↔ Native
+- 透過 **Event Channel** (`com.example.castsquat/cast_events`) 接收裝置和連線事件
+- Android：Cast SDK 21.5.0 + `CastContext.getSharedInstance()` 非同步初始化
+- iOS：google-cast-sdk-no-bluetooth 4.8 + `GCKDiscoveryManager`
+- 按鈕操作使用 fire-and-forget（不 await 網路呼叫），避免 UI 延遲
+
+## Performance Notes（Chromecast v3 優化）
+
+開發時需注意以下效能限制（已實施的優化）：
+
+1. **禁止每幀設定 `canvas.width`/`canvas.height`** — 這會強制重建整個 Canvas buffer，是最大效能殺手。Canvas resize 僅在 `window.resize` 事件中執行。
+2. **避免 `ctx.filter`** — `hue-rotate()`、`brightness()` 等 CSS filter 在 Canvas 上極為耗效能。殘影系統改用純 alpha 透明度。
+3. **控制粒子數量** — 落地粒子 6 個、金幣粒子 5 個、速度線 4 條、星空 40 顆。新增特效時需注意總量。
+4. **預計算常數值** — 星空顏色等不變的值在初始化時計算，避免每幀建立新字串。
 
 ## Development Guidelines
 

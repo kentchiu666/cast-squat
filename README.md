@@ -32,7 +32,7 @@
     - 速度線
     - 螢幕震動
 -   **金幣系統**：金幣從右側移動到左側，跳躍收集可得分
--   **遊戲狀態管理**：`START_SCREEN` → `COUNTDOWN` → `PLAYING` → `GAME_OVER`
+-   **遊戲狀態管理**：`START_SCREEN` → `COUNTDOWN` → `PLAYING` → `GAME_OVER`（支援 Cast 重新開始）
 -   **3-2-1 倒數動畫**：遊戲開始前有倒數提示
 -   **多人等候室**：START_SCREEN 顯示已加入的玩家，支援最多 4 人
 -   **多人獨立計分**：各玩家獨立角色、獨立跳躍、獨立收集金幣
@@ -96,6 +96,7 @@ php -S localhost:8080
 4. 點擊「START GAME」鎖定玩家列表，進入倒數
 5. 遊戲中各玩家發送 `SQUAT_JUMP` 控制自己的角色
 6. 時間結束顯示排行榜
+7. 透過 Sender 發送 `START_GAME` 可重新開始（自動重置玩家列表）
 
 ### 執行接收器 (Google Cast)
 
@@ -112,8 +113,36 @@ php -S localhost:8080
       - 玩家加入：`{ action: 'PLAYER_JOIN', playerId: 'xxx', playerName: 'Alice' }`
       - 玩家離開：`{ action: 'PLAYER_LEAVE', playerId: 'xxx' }`
       - 跳躍：`{ action: 'SQUAT_JUMP', playerId: 'xxx' }`
-      - 開始遊戲：`{ action: 'START_GAME' }`
+      - 開始/重新開始遊戲：`{ action: 'START_GAME' }`（在 START_SCREEN 或 GAME_OVER 狀態均有效）
       - 舊格式（單人）：`{ action: 'SQUAT_JUMP' }`
+
+## 部署
+
+### GitHub Pages 自動部署
+- **Receiver URL**：`https://kentchiu666.github.io/cast-squat/`
+- **Application ID**：`DD35BB50`
+- 推送到 `main` 分支後 GitHub Pages 自動部署
+
+### 搭配 Sender App
+- **Flutter Sender App** 位於獨立專案 `cast_squat_sender/`
+- 使用 **官方 Google Cast SDK**（透過 Method Channel 橋接）
+- 支援 Android（Cast SDK 21.5.0）和 iOS（google-cast-sdk-no-bluetooth 4.8）
+- Sender App 負責：裝置探索、Cast 連線、發送遊戲訊息
+
+## 效能優化（Chromecast v3）
+
+此專案已針對 Chromecast v3（第二代）等低階設備進行效能優化：
+
+| 優化項目 | 說明 |
+|----------|------|
+| Canvas resize | 僅在 `window.resize` 事件時調整，避免每幀重建 Canvas buffer |
+| 殘影系統 | 移除 `ctx.filter`（hue-rotate/brightness），改用純 alpha 透明度 |
+| 落地粒子 | 從 12 個減少為 6 個 |
+| 金幣粒子 | 從 10 個減少為 5 個 |
+| 速度線 | 從 8 條減少為 4 條 |
+| 星空背景 | 從 100 顆減少為 40 顆，預計算顏色字串 |
+
+> **關鍵發現**：`canvas.width = window.innerWidth` 每幀執行會強制重建整個 Canvas buffer，這是 Chromecast 上最大的效能瓶頸。
 
 ## 開發慣例
 

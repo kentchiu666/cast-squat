@@ -12,7 +12,8 @@ import {
     updatePlayerJump,
     drawPlayerCharacter,
     drawPlayerPreview,
-    drawPlayersStatic
+    drawPlayersStatic,
+    initColoredSpritesheets
 } from './character.js';
 import { updateCoins, drawCoins, getCoinScore, resetCoins, updateCoinsMultiplayer } from './coins.js';
 import {
@@ -50,6 +51,10 @@ let finalScore = 0;
 let startCountdown = 3;
 let countdownAnimTimer = 0;
 
+// === 渲染控制 ===
+let frameCount = 0;
+const RENDER_EVERY = 2;  // 每 2 幀繪製 1 次（邏輯 60fps，渲染 30fps）
+
 // === 星空背景 ===
 let starfield = [];
 
@@ -82,6 +87,9 @@ export function initGame(canvasElement, spritesheetImage) {
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
+
+    // 預渲染彩色精靈圖（消除每幀 ctx.filter）
+    initColoredSpritesheets(spritesheet);
 
     // 等待素材載入
     if (spritesheet.complete) {
@@ -173,8 +181,19 @@ function triggerJump() {
     }
 }
 
-// === 主繪製迴圈 ===
+// === 主迴圈（邏輯 60fps，渲染 30fps）===
 function draw() {
+    requestAnimationFrame(draw);
+
+    // PLAYING 時每幀更新邏輯（保持跳躍手感）
+    if (gameState === 'PLAYING') {
+        updateGameLogic();
+    }
+
+    // 渲染每 2 幀執行一次（30fps）
+    frameCount++;
+    if (frameCount % RENDER_EVERY !== 0) return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     drawStarfield();
@@ -187,14 +206,12 @@ function draw() {
             drawCountdownScreen();
             break;
         case 'PLAYING':
-            drawPlayingScreen();
+            renderPlayingScreen();
             break;
         case 'GAME_OVER':
             drawGameOverScreen();
             break;
     }
-
-    requestAnimationFrame(draw);
 }
 
 // === 繪製開始畫面（等候室）===
@@ -314,38 +331,44 @@ function drawCountdownScreen() {
     }
 }
 
-// === 繪製遊戲畫面 ===
-function drawPlayingScreen() {
+// === 遊戲邏輯更新（每幀 60fps）===
+function updateGameLogic() {
+    if (isMultiplayerMode()) {
+        const players = getPlayers();
+        const positions = getPlayerPositions(canvas.width);
+
+        players.forEach((player, index) => {
+            updatePlayerJump(player, canvas.width, canvas.height, positions[index]);
+        });
+
+        updateCoinsMultiplayer(canvas.width, canvas.height, players, positions);
+    } else {
+        updateJump(canvas.width, canvas.height);
+        const { characterY, squashStretch } = getCharacterState();
+        updateCoins(canvas.width, canvas.height, characterY, squashStretch);
+    }
+
+    updateParticles();
+    updateAfterImages();
+    updateSpeedLines();
+    updateScreenShake();
+}
+
+// === 遊戲畫面渲染（30fps）===
+function renderPlayingScreen() {
     actionButton.innerText = "JUMP!";
 
     if (isMultiplayerMode()) {
-        // 多人模式 UI
-        uiDisplay.innerText = "";  // 分數顯示在畫面上
+        uiDisplay.innerText = "";
         timerUi.innerText = `TIME: ${timer}`;
 
         const players = getPlayers();
         const positions = getPlayerPositions(canvas.width);
 
-        // 更新所有玩家的跳躍狀態
-        players.forEach((player, index) => {
-            updatePlayerJump(player, canvas.width, canvas.height, positions[index]);
-        });
-
-        // 更新金幣（多人版本）
-        updateCoinsMultiplayer(canvas.width, canvas.height, players, positions);
-
-        // 更新特效
-        updateParticles();
-        updateAfterImages();
-        updateSpeedLines();
-        updateScreenShake();
-
-        // 套用螢幕震動
         const screenShake = getScreenShake();
         ctx.save();
         ctx.translate(screenShake.x, screenShake.y);
 
-        // 繪製場景
         drawFloor();
 
         if (!imageLoaded) {
@@ -353,12 +376,10 @@ function drawPlayingScreen() {
             return;
         }
 
-        // 繪製順序：速度線 → 金幣 → 殘影 → 角色 → 粒子
         drawSpeedLines(ctx);
         drawCoins(ctx, spritesheet);
         drawAfterImages(ctx, spritesheet, canvas.width, canvas.height);
 
-        // 繪製所有玩家角色
         players.forEach((player, index) => {
             drawPlayerCharacter(ctx, spritesheet, player, positions[index], canvas.height);
         });
@@ -366,28 +387,15 @@ function drawPlayingScreen() {
         drawParticles(ctx);
         ctx.restore();
 
-        // 繪製各玩家分數（畫面頂部）
         drawPlayerScores(players);
     } else {
-        // 單人模式
         uiDisplay.innerText = `SQUATS: ${squatCount} | COINS: ${getCoinScore()}`;
         timerUi.innerText = `TIME: ${timer}`;
 
-        // 更新所有系統
-        updateJump(canvas.width, canvas.height);
-        const { characterY, squashStretch } = getCharacterState();
-        updateCoins(canvas.width, canvas.height, characterY, squashStretch);
-        updateParticles();
-        updateAfterImages();
-        updateSpeedLines();
-        updateScreenShake();
-
-        // 套用螢幕震動
         const screenShake = getScreenShake();
         ctx.save();
         ctx.translate(screenShake.x, screenShake.y);
 
-        // 繪製場景
         drawFloor();
 
         if (!imageLoaded) {
@@ -395,7 +403,6 @@ function drawPlayingScreen() {
             return;
         }
 
-        // 繪製順序：速度線 → 金幣 → 殘影 → 角色 → 粒子
         drawSpeedLines(ctx);
         drawCoins(ctx, spritesheet);
         drawAfterImages(ctx, spritesheet, canvas.width, canvas.height);
