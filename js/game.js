@@ -51,16 +51,15 @@ let finalScore = 0;
 let startCountdown = 3;
 let countdownAnimTimer = 0;
 
-// === 渲染控制 ===
-let frameCount = 0;
-const RENDER_EVERY = 2;  // 每 2 幀繪製 1 次（邏輯 60fps，渲染 30fps）
-
 // === 星空背景 ===
 let starfield = [];
 
 // === Canvas 和素材 ===
 let canvas, ctx, spritesheet;
 let imageLoaded = false;
+const CANVAS_SCALE = 0.5;  // Canvas 解析度縮放（0.5 = 減少 75% 像素量）
+let logicalWidth = 0;       // 邏輯寬度（程式碼座標系）
+let logicalHeight = 0;      // 邏輯高度（程式碼座標系）
 
 // === UI 元素 ===
 let uiDisplay, timerUi, actionButton;
@@ -79,11 +78,16 @@ export function initGame(canvasElement, spritesheetImage) {
     // 監聽按鈕
     actionButton.addEventListener('click', handleAction);
 
-    // Canvas 只在視窗大小改變時調整（避免每幀重建）
+    // Canvas 低解析度渲染 + CSS 拉伸（大幅減少 GPU 像素填充量）
     function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        logicalWidth = window.innerWidth;
+        logicalHeight = window.innerHeight;
+        canvas.width = Math.floor(logicalWidth * CANVAS_SCALE);
+        canvas.height = Math.floor(logicalHeight * CANVAS_SCALE);
+        canvas.style.width = logicalWidth + 'px';
+        canvas.style.height = logicalHeight + 'px';
         ctx.imageSmoothingEnabled = false;
+        ctx.scale(CANVAS_SCALE, CANVAS_SCALE);
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
@@ -181,20 +185,9 @@ function triggerJump() {
     }
 }
 
-// === 主迴圈（邏輯 60fps，渲染 30fps）===
+// === 主繪製迴圈 ===
 function draw() {
-    requestAnimationFrame(draw);
-
-    // PLAYING 時每幀更新邏輯（保持跳躍手感）
-    if (gameState === 'PLAYING') {
-        updateGameLogic();
-    }
-
-    // 渲染每 2 幀執行一次（30fps）
-    frameCount++;
-    if (frameCount % RENDER_EVERY !== 0) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
 
     drawStarfield();
 
@@ -206,12 +199,14 @@ function draw() {
             drawCountdownScreen();
             break;
         case 'PLAYING':
-            renderPlayingScreen();
+            drawPlayingScreen();
             break;
         case 'GAME_OVER':
             drawGameOverScreen();
             break;
     }
+
+    requestAnimationFrame(draw);
 }
 
 // === 繪製開始畫面（等候室）===
@@ -228,12 +223,12 @@ function drawStartScreen() {
     ctx.textAlign = 'center';
 
     // 標題
-    ctx.fillText("Squat Jump", canvas.width / 2, 100);
+    ctx.fillText("Squat Jump", logicalWidth / 2, 100);
 
     // 玩家計數
     ctx.font = "20px 'Press Start 2P'";
     ctx.fillStyle = '#888';
-    ctx.fillText(`${playerCount}/${MULTIPLAYER_CONFIG.MAX_PLAYERS} Players`, canvas.width / 2, 160);
+    ctx.fillText(`${playerCount}/${MULTIPLAYER_CONFIG.MAX_PLAYERS} Players`, logicalWidth / 2, 160);
 
     if (imageLoaded) {
         // 繪製玩家列表
@@ -245,27 +240,27 @@ function drawStartScreen() {
                 const y = startY + index * spacing;
 
                 // 繪製角色預覽
-                drawPlayerPreview(ctx, spritesheet, player, canvas.width / 2 - 120, y);
+                drawPlayerPreview(ctx, spritesheet, player, logicalWidth / 2 - 120, y);
 
                 // 繪製玩家名稱（使用玩家顏色）
                 ctx.fillStyle = PLAYER_COLORS[player.colorIndex].hex;
                 ctx.font = "16px 'Press Start 2P'";
                 ctx.textAlign = 'left';
-                ctx.fillText(player.name, canvas.width / 2 - 60, y + 8);
+                ctx.fillText(player.name, logicalWidth / 2 - 60, y + 8);
                 ctx.textAlign = 'center';
             });
 
             // 提示開始
             ctx.fillStyle = '#95E86B';
             ctx.font = "18px 'Press Start 2P'";
-            ctx.fillText("CLICK TO START", canvas.width / 2, canvas.height - 150);
+            ctx.fillText("CLICK TO START", logicalWidth / 2, logicalHeight - 150);
         } else {
             // 等待玩家加入
             ctx.fillStyle = '#888';
             ctx.font = "18px 'Press Start 2P'";
-            ctx.fillText("WAITING FOR PLAYERS...", canvas.width / 2, canvas.height / 2);
+            ctx.fillText("WAITING FOR PLAYERS...", logicalWidth / 2, logicalHeight / 2);
             ctx.font = "14px 'Press Start 2P'";
-            ctx.fillText("(Or click START for single player)", canvas.width / 2, canvas.height / 2 + 40);
+            ctx.fillText("(Or click START for single player)", logicalWidth / 2, logicalHeight / 2 + 40);
         }
     }
 }
@@ -283,10 +278,10 @@ function drawCountdownScreen() {
     if (imageLoaded) {
         if (isMultiplayerMode()) {
             // 多人模式：繪製所有玩家角色
-            drawPlayersStatic(ctx, spritesheet, getPlayers(), canvas.width, canvas.height);
+            drawPlayersStatic(ctx, spritesheet, getPlayers(), logicalWidth, logicalHeight);
         } else {
             // 單人模式：繪製單一角色
-            drawStaticCharacter(ctx, spritesheet, canvas.width, canvas.height);
+            drawStaticCharacter(ctx, spritesheet, logicalWidth, logicalHeight);
         }
     }
 
@@ -305,7 +300,7 @@ function drawCountdownScreen() {
     const alpha = animProgress > 0.7 ? 1 - (animProgress - 0.7) / 0.3 : 1;
     ctx.globalAlpha = alpha;
 
-    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.translate(logicalWidth / 2, logicalHeight / 2);
     ctx.scale(baseScale, baseScale);
 
     const displayText = startCountdown > 0 ? startCountdown.toString() : "GO!";
@@ -331,31 +326,8 @@ function drawCountdownScreen() {
     }
 }
 
-// === 遊戲邏輯更新（每幀 60fps）===
-function updateGameLogic() {
-    if (isMultiplayerMode()) {
-        const players = getPlayers();
-        const positions = getPlayerPositions(canvas.width);
-
-        players.forEach((player, index) => {
-            updatePlayerJump(player, canvas.width, canvas.height, positions[index]);
-        });
-
-        updateCoinsMultiplayer(canvas.width, canvas.height, players, positions);
-    } else {
-        updateJump(canvas.width, canvas.height);
-        const { characterY, squashStretch } = getCharacterState();
-        updateCoins(canvas.width, canvas.height, characterY, squashStretch);
-    }
-
-    updateParticles();
-    updateAfterImages();
-    updateSpeedLines();
-    updateScreenShake();
-}
-
-// === 遊戲畫面渲染（30fps）===
-function renderPlayingScreen() {
+// === 繪製遊戲畫面 ===
+function drawPlayingScreen() {
     actionButton.innerText = "JUMP!";
 
     if (isMultiplayerMode()) {
@@ -363,8 +335,19 @@ function renderPlayingScreen() {
         timerUi.innerText = `TIME: ${timer}`;
 
         const players = getPlayers();
-        const positions = getPlayerPositions(canvas.width);
+        const positions = getPlayerPositions(logicalWidth);
 
+        // 更新邏輯
+        players.forEach((player, index) => {
+            updatePlayerJump(player, logicalWidth, logicalHeight, positions[index]);
+        });
+        updateCoinsMultiplayer(logicalWidth, logicalHeight, players, positions);
+        updateParticles();
+        updateAfterImages();
+        updateSpeedLines();
+        updateScreenShake();
+
+        // 渲染
         const screenShake = getScreenShake();
         ctx.save();
         ctx.translate(screenShake.x, screenShake.y);
@@ -378,10 +361,10 @@ function renderPlayingScreen() {
 
         drawSpeedLines(ctx);
         drawCoins(ctx, spritesheet);
-        drawAfterImages(ctx, spritesheet, canvas.width, canvas.height);
+        drawAfterImages(ctx, spritesheet, logicalWidth, logicalHeight);
 
         players.forEach((player, index) => {
-            drawPlayerCharacter(ctx, spritesheet, player, positions[index], canvas.height);
+            drawPlayerCharacter(ctx, spritesheet, player, positions[index], logicalHeight);
         });
 
         drawParticles(ctx);
@@ -392,6 +375,16 @@ function renderPlayingScreen() {
         uiDisplay.innerText = `SQUATS: ${squatCount} | COINS: ${getCoinScore()}`;
         timerUi.innerText = `TIME: ${timer}`;
 
+        // 更新邏輯
+        updateJump(logicalWidth, logicalHeight);
+        const { characterY, squashStretch } = getCharacterState();
+        updateCoins(logicalWidth, logicalHeight, characterY, squashStretch);
+        updateParticles();
+        updateAfterImages();
+        updateSpeedLines();
+        updateScreenShake();
+
+        // 渲染
         const screenShake = getScreenShake();
         ctx.save();
         ctx.translate(screenShake.x, screenShake.y);
@@ -405,8 +398,8 @@ function renderPlayingScreen() {
 
         drawSpeedLines(ctx);
         drawCoins(ctx, spritesheet);
-        drawAfterImages(ctx, spritesheet, canvas.width, canvas.height);
-        drawCharacter(ctx, spritesheet, canvas.width, canvas.height);
+        drawAfterImages(ctx, spritesheet, logicalWidth, logicalHeight);
+        drawCharacter(ctx, spritesheet, logicalWidth, logicalHeight);
         drawParticles(ctx);
 
         ctx.restore();
@@ -415,7 +408,7 @@ function renderPlayingScreen() {
 
 // === 繪製各玩家分數（多人模式）===
 function drawPlayerScores(players) {
-    const spacing = canvas.width / (players.length + 1);
+    const spacing = logicalWidth / (players.length + 1);
 
     ctx.font = "14px 'Press Start 2P'";
     ctx.textAlign = 'center';
@@ -444,7 +437,7 @@ function drawGameOverScreen() {
     ctx.fillStyle = 'white';
     ctx.font = "48px 'Press Start 2P'";
     ctx.textAlign = 'center';
-    ctx.fillText("GAME OVER!", canvas.width / 2, 100);
+    ctx.fillText("GAME OVER!", logicalWidth / 2, 100);
 
     if (isMultiplayerMode()) {
         // 多人模式：顯示排行榜
@@ -452,7 +445,7 @@ function drawGameOverScreen() {
         const medals = ['1st', '2nd', '3rd', '4th'];
 
         ctx.font = "24px 'Press Start 2P'";
-        ctx.fillText("LEADERBOARD", canvas.width / 2, 180);
+        ctx.fillText("LEADERBOARD", logicalWidth / 2, 180);
 
         leaderboard.forEach((player, rank) => {
             const y = 250 + rank * 70;
@@ -464,22 +457,22 @@ function drawGameOverScreen() {
             ctx.fillStyle = rankColors[rank] || '#888';
             ctx.font = "18px 'Press Start 2P'";
             ctx.textAlign = 'right';
-            ctx.fillText(medals[rank], canvas.width / 2 - 120, y);
+            ctx.fillText(medals[rank], logicalWidth / 2 - 120, y);
 
             // 角色預覽
             if (imageLoaded) {
-                drawPlayerPreview(ctx, spritesheet, player, canvas.width / 2 - 80, y - 15);
+                drawPlayerPreview(ctx, spritesheet, player, logicalWidth / 2 - 80, y - 15);
             }
 
             // 玩家名稱
             ctx.fillStyle = colorInfo.hex;
             ctx.textAlign = 'left';
-            ctx.fillText(player.name, canvas.width / 2 - 40, y);
+            ctx.fillText(player.name, logicalWidth / 2 - 40, y);
 
             // 分數
             ctx.fillStyle = 'white';
             ctx.textAlign = 'right';
-            ctx.fillText(`${total}`, canvas.width / 2 + 150, y);
+            ctx.fillText(`${total}`, logicalWidth / 2 + 150, y);
 
             ctx.textAlign = 'center';
         });
@@ -487,20 +480,20 @@ function drawGameOverScreen() {
         // 單人模式：顯示分數
         const totalScore = finalScore + getCoinScore();
         ctx.font = "32px 'Press Start 2P'";
-        ctx.fillText(`TOTAL: ${totalScore}`, canvas.width / 2, canvas.height / 2);
+        ctx.fillText(`TOTAL: ${totalScore}`, logicalWidth / 2, logicalHeight / 2);
 
         ctx.font = "18px 'Press Start 2P'";
-        ctx.fillText(`Squats: ${finalScore} + Coins: ${getCoinScore()}`, canvas.width / 2, canvas.height / 2 + 50);
+        ctx.fillText(`Squats: ${finalScore} + Coins: ${getCoinScore()}`, logicalWidth / 2, logicalHeight / 2 + 50);
     }
 }
 
 // === 繪製地板 ===
 function drawFloor() {
-    const floorY = canvas.height - SCENE_CONFIG.FLOOR_HEIGHT;
+    const floorY = logicalHeight - SCENE_CONFIG.FLOOR_HEIGHT;
     ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(0, floorY, canvas.width, SCENE_CONFIG.FLOOR_HEIGHT);
+    ctx.fillRect(0, floorY, logicalWidth, SCENE_CONFIG.FLOOR_HEIGHT);
     ctx.fillStyle = '#4a4a4a';
-    ctx.fillRect(0, floorY, canvas.width, 4);
+    ctx.fillRect(0, floorY, logicalWidth, 4);
 }
 
 // === 星空背景 ===
@@ -525,8 +518,8 @@ function drawStarfield() {
     starfield.forEach(star => {
         star.x -= star.speed;
         if (star.x < 0) {
-            star.x = canvas.width;
-            star.y = Math.random() * canvas.height;
+            star.x = logicalWidth;
+            star.y = Math.random() * logicalHeight;
         }
         ctx.fillStyle = star.color;
         ctx.fillRect(Math.floor(star.x), Math.floor(star.y), star.size, star.size);
