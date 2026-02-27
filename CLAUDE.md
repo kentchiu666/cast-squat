@@ -422,3 +422,23 @@ npm run build    # vue-tsc 型別檢查 + Vite 建置
 - Research 模板: `.claude/templates/research.md`
 - Plan 模板: `.claude/templates/plan.md`
 - 工作文件存放: `.claude/docs/`（按功能命名）
+
+## API 整合規則（AI 必讀）
+
+### Swagger Spec 來源
+- **遠端**：`https://gwp-backend-dev.gomore.net/api-json`
+- 每次使用 `/api` 時直接 WebFetch 遠端，確保最新
+
+### /api Skill
+使用 `/api` 指令查詢 API spec：
+- `/api list` — 列出所有 endpoints
+- `/api GET /path` — 查看特定 endpoint 細節
+- `/api types` — 產出 TypeScript 型別
+- `/api fetch GET /path` — 產出 fetch 呼叫程式碼
+- `/api search 關鍵字` — 搜尋 endpoints
+
+### API 整合開發規範
+1. **型別優先**：先從 Swagger schema 產出 TypeScript interface，再寫呼叫程式碼
+2. **API 呼叫集中管理**：放在 `src/api/` 目錄
+3. **錯誤處理**：統一的 error response 型別
+4. **認證**：Bearer token 透過統一的 header 注入
