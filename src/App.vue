@@ -391,18 +391,26 @@ async function handleGameSelect(gameId: string) {
     return
   }
 
-  const mod = await gameInfo.module()
-  activeGame = mod.default
-  activeGameId.value = gameId
+  try {
+    addDebug(`LOADING module...`)
+    const mod = await gameInfo.module()
+    addDebug(`MODULE loaded, default=${!!mod.default}`)
+    activeGame = mod.default
+    activeGameId.value = gameId
 
-  addDebug(`INIT: ${activeGame.id} sheets=${characterSheets.value.filter(Boolean).length}`)
-  activeGame.init(canvasRef.value, ctx, characterSheets.value, itemSpritesheet, textLayerRef.value)
-  activeGame.setBroadcastCallbacks(castBroadcast, castReply)
-  activeGame.setReturnToLobbyCallback?.(() => handleReturnToLobby())
-  activeGame.start()
-  platformState.value = 'GAME_ACTIVE'
-  addDebug(`STARTED: ${gameId}`)
-  broadcastPlatformState()
+    addDebug(`INIT: ${activeGame.id} sheets=${characterSheets.value.filter(Boolean).length} item=${!!itemSpritesheet}`)
+    activeGame.init(canvasRef.value, ctx, characterSheets.value, itemSpritesheet, textLayerRef.value)
+    addDebug(`INIT done`)
+    activeGame.setBroadcastCallbacks(castBroadcast, castReply)
+    activeGame.setReturnToLobbyCallback?.(() => handleReturnToLobby())
+    activeGame.start()
+    platformState.value = 'GAME_ACTIVE'
+    addDebug(`STARTED: ${gameId}`)
+    broadcastPlatformState()
+  } catch (e) {
+    addDebug(`ERROR: ${e instanceof Error ? e.message : String(e)}`)
+    console.error('[GameSelect] 載入失敗:', e)
+  }
 }
 
 // === 返回 LOBBY ===
