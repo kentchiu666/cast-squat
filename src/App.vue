@@ -160,18 +160,31 @@ function broadcastPlatformState(senderId?: string): void {
 }
 
 function handleCastMessage(event: { data: unknown; senderId: string }): void {
-  const data = event.data as CastMessageData
+  let data = event.data as CastMessageData
   const senderId = event.senderId
 
   console.log('[Cast] 收到訊息:', JSON.stringify(data), 'from:', senderId)
 
-  // 舊版字串訊息，直接轉發給遊戲
+  // Cast SDK 可能傳入 JSON 字串，先嘗試解析
   if (typeof data === 'string') {
-    activeGame?.handleMessage(data, senderId)
-    return
+    try {
+      const parsed = JSON.parse(data)
+      if (typeof parsed === 'object' && parsed !== null && 'action' in parsed) {
+        data = parsed as CastMessageData
+      } else {
+        // 非結構化字串，轉發給遊戲
+        activeGame?.handleMessage(data, senderId)
+        return
+      }
+    } catch {
+      // 非 JSON 字串，轉發給遊戲
+      activeGame?.handleMessage(data, senderId)
+      return
+    }
   }
 
-  // 平台級訊息
+  // 平台級訊息（字串已在上面處理掉）
+  if (typeof data === 'string') return
   switch (data.action) {
     case 'LOAD_GAME':
       handleGameSelect(data.gameId)
