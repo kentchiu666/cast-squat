@@ -412,6 +412,18 @@ function handleCardClick(index: number) {
     selectedIndex.value = index
   }
 }
+
+// === 暴露導航方法（供 App.vue 透過 ref 呼叫，用於 Cast 遙控）===
+defineExpose({
+  navigateLeft: () => {
+    if (selectedIndex.value > 0) selectedIndex.value--
+  },
+  navigateRight: () => {
+    if (selectedIndex.value < games.length - 1) selectedIndex.value++
+  },
+  getSelectedIndex: () => selectedIndex.value,
+  getSelectedGameId: () => games[selectedIndex.value]?.id ?? null,
+})
 </script>
 
 <style scoped>

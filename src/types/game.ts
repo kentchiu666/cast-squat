@@ -45,6 +45,9 @@ export type CastMessageData =
   | { action: 'QUERY_STATE' }
   | { action: 'LOAD_GAME'; gameId: string }
   | { action: 'RETURN_LOBBY' }
+  | { action: 'NAVIGATE_LEFT' }
+  | { action: 'NAVIGATE_RIGHT' }
+  | { action: 'SELECT_GAME' }
   | { action: 'PLAYER_JOIN'; playerId: string; playerName: string }
   | { action: 'PLAYER_LEAVE'; playerId: string }
   | { action: 'START_GAME' }
@@ -52,6 +55,17 @@ export type CastMessageData =
   | { action: 'SHAKE'; playerId?: string }
   | { action: 'GAME_RESULT'; playerId: string; score: number; details?: { shakes: number } }
   | string  // 舊版相容
+
+// === 精簡遊戲資訊（Cast 廣播用，去掉不可序列化的 module）===
+export interface GameInfoSlim {
+  id: string
+  name: string
+  description: string
+  icon: string
+  iconColor: string
+  typeLabel: string
+  available: boolean
+}
 
 // === 通訊函數型別 ===
 export type BroadcastFn = (data: Record<string, unknown>) => void

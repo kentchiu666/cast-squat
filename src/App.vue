@@ -7,6 +7,7 @@
     <div id="textLayer" ref="textLayerRef">
       <LobbyScreen
         v-if="platformState === 'LOBBY'"
+        ref="lobbyRef"
         @select-game="handleGameSelect"
       />
     </div>
@@ -17,10 +18,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, provide, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, provide, nextTick, onMounted, onUnmounted } from 'vue'
 import LobbyScreen from './components/LobbyScreen.vue'
-import type { GameModule, PlatformState } from './types/game'
-import { getGameById } from './game-registry'
+import type { GameModule, PlatformState, CastMessageData, GameInfoSlim } from './types/game'
+import { getGameById, GAMES } from './game-registry'
 
 // === 平台狀態 ===
 const platformState = ref<PlatformState>('LOBBY')
@@ -93,8 +94,136 @@ function normalizeSheet(
 provide('characterSheets', characterSheets)
 provide('standardSprites', STANDARD_SPRITES)
 
+// === LobbyScreen ref（Cast 遙控用）===
+const lobbyRef = ref<InstanceType<typeof LobbyScreen> | null>(null)
+
 // === 當前遊戲 ===
 let activeGame: GameModule | null = null
+
+// === Cast Receiver ===
+const CAST_NAMESPACE = 'urn:x-cast:com.example.castsquat'
+let castContext: cast.framework.CastReceiverContext | null = null
+
+function castBroadcast(data: Record<string, unknown>): void {
+  console.log('[Broadcast]', JSON.stringify(data))
+  if (castContext) {
+    try {
+      castContext.sendCustomMessage(CAST_NAMESPACE, undefined, data)
+    } catch (e) {
+      console.warn('[Cast] Broadcast 失敗:', e)
+    }
+  }
+}
+
+function castReply(senderId: string, data: Record<string, unknown>): void {
+  console.log(`[Reply→${senderId}]`, JSON.stringify(data))
+  if (castContext) {
+    try {
+      castContext.sendCustomMessage(CAST_NAMESPACE, senderId, data)
+    } catch (e) {
+      console.warn('[Cast] Reply 失敗:', e)
+    }
+  }
+}
+
+function broadcastLobbyState(): void {
+  const games: GameInfoSlim[] = GAMES.map(g => ({
+    id: g.id,
+    name: g.name,
+    description: g.description,
+    icon: g.icon,
+    iconColor: g.iconColor,
+    typeLabel: g.typeLabel,
+    available: g.available,
+  }))
+  castBroadcast({
+    type: 'LOBBY_STATE',
+    games,
+    selectedIndex: lobbyRef.value?.getSelectedIndex() ?? 0,
+  })
+}
+
+function broadcastPlatformState(senderId?: string): void {
+  const stateData: Record<string, unknown> = {
+    type: 'PLATFORM_STATE',
+    state: platformState.value,
+  }
+  if (platformState.value === 'GAME_ACTIVE' && activeGame) {
+    stateData.gameId = activeGame.id
+    stateData.gameState = activeGame.getState()
+  }
+  if (senderId) {
+    castReply(senderId, stateData)
+  } else {
+    castBroadcast(stateData)
+  }
+}
+
+function handleCastMessage(event: { data: unknown; senderId: string }): void {
+  const data = event.data as CastMessageData
+  const senderId = event.senderId
+
+  console.log('[Cast] 收到訊息:', JSON.stringify(data), 'from:', senderId)
+
+  // 舊版字串訊息，直接轉發給遊戲
+  if (typeof data === 'string') {
+    activeGame?.handleMessage(data, senderId)
+    return
+  }
+
+  // 平台級訊息
+  switch (data.action) {
+    case 'LOAD_GAME':
+      handleGameSelect(data.gameId)
+      return
+    case 'RETURN_LOBBY':
+      handleReturnToLobby()
+      return
+    case 'QUERY_STATE':
+      broadcastPlatformState(senderId)
+      if (platformState.value === 'LOBBY') broadcastLobbyState()
+      return
+    case 'NAVIGATE_LEFT':
+      if (platformState.value === 'LOBBY') {
+        lobbyRef.value?.navigateLeft()
+        broadcastLobbyState()
+      }
+      return
+    case 'NAVIGATE_RIGHT':
+      if (platformState.value === 'LOBBY') {
+        lobbyRef.value?.navigateRight()
+        broadcastLobbyState()
+      }
+      return
+    case 'SELECT_GAME': {
+      if (platformState.value === 'LOBBY') {
+        const selectedId = lobbyRef.value?.getSelectedGameId()
+        if (selectedId) handleGameSelect(selectedId)
+      }
+      return
+    }
+  }
+
+  // 遊戲級訊息，轉發
+  activeGame?.handleMessage(data, senderId)
+}
+
+function initCastReceiver(): void {
+  if (typeof cast === 'undefined' || !cast.framework) {
+    console.log('[Cast] SDK 不存在，使用本地測試模式')
+    return
+  }
+
+  try {
+    castContext = cast.framework.CastReceiverContext.getInstance()
+    castContext.addCustomMessageListener(CAST_NAMESPACE, handleCastMessage)
+    castContext.start()
+    console.log('[Cast] Receiver 已啟動')
+  } catch (e) {
+    console.warn('[Cast] 初始化失敗:', e)
+    castContext = null
+  }
+}
 
 // === Canvas 尺寸 ===
 const CANVAS_SCALE = 1
@@ -223,13 +352,11 @@ async function handleGameSelect(gameId: string) {
   activeGame = mod.default
 
   activeGame.init(canvasRef.value, ctx, characterSheets.value, itemSpritesheet, textLayerRef.value)
-  activeGame.setBroadcastCallbacks(
-    (data) => console.log('[Broadcast]', JSON.stringify(data)),
-    (senderId, data) => console.log(`[Reply to ${senderId}]`, JSON.stringify(data)),
-  )
+  activeGame.setBroadcastCallbacks(castBroadcast, castReply)
   activeGame.setReturnToLobbyCallback?.(() => handleReturnToLobby())
   activeGame.start()
   platformState.value = 'GAME_ACTIVE'
+  broadcastPlatformState()
 }
 
 // === 返回 LOBBY ===
@@ -240,6 +367,8 @@ function handleReturnToLobby() {
     activeGame = null
   }
   platformState.value = 'LOBBY'
+  broadcastPlatformState()
+  nextTick(() => broadcastLobbyState())
 }
 
 // === 生命週期 ===
@@ -292,11 +421,20 @@ onMounted(() => {
   tickAccumulator = 0
   animFrameId = requestAnimationFrame(gameLoop)
 
+  // 初始化 Cast Receiver
+  initCastReceiver()
+
   // 暴露 gameAPI 供 Console 測試
   ;(globalThis as Record<string, unknown>).gameAPI = {
-    handleCastMessage: (data: unknown) => activeGame?.handleMessage(data as never),
+    handleCastMessage: (data: unknown, senderId?: string) => {
+      handleCastMessage({ data, senderId: senderId ?? 'console' })
+    },
     getState: () => activeGame?.getState() ?? platformState.value,
     returnToLobby: () => handleReturnToLobby(),
+    getLobbyState: () => ({
+      selectedIndex: lobbyRef.value?.getSelectedIndex(),
+      selectedGame: lobbyRef.value?.getSelectedGameId(),
+    }),
   }
 
   console.log('平台已初始化 - LOBBY 模式')
@@ -307,6 +445,10 @@ onUnmounted(() => {
     activeGame.stop()
     activeGame.destroy()
     activeGame = null
+  }
+  if (castContext) {
+    castContext.stop()
+    castContext = null
   }
   window.removeEventListener('resize', resizeCanvas)
   cancelAnimationFrame(animFrameId)

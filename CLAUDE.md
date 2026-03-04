@@ -34,7 +34,8 @@ cast-squat/
 │   ├── App.vue                         # 主元件（Canvas + 星空 + 遊戲迴圈）
 │   ├── game-registry.ts                # 遊戲註冊表（動態 import）
 │   ├── types/
-│   │   └── game.ts                     # 所有型別定義
+│   │   ├── game.ts                     # 所有型別定義（含 Cast 訊息、GameInfoSlim）
+│   │   └── cast-sdk.d.ts               # Cast CAF Receiver SDK 最小型別宣告
 │   ├── components/
 │   │   ├── LobbyScreen.vue             # LOBBY 大廳畫面
 │   │   └── GameCard.vue                # 遊戲卡片元件
@@ -166,23 +167,36 @@ gameLoop(timestamp)
 - **Application ID**: `DD35BB50`
 - **Namespace**: `urn:x-cast:com.example.castsquat`
 - **Receiver URL**: `https://kentchiu666.github.io/cast-squat/`
-- **平台級訊息**（App.vue 處理）：
+- **Cast SDK 型別宣告**：`src/types/cast-sdk.d.ts`（最小 `.d.ts`，僅宣告用到的 API）
+- **初始化**：App.vue `onMounted` → `initCastReceiver()`，無 Cast SDK 時自動降級為本地測試模式
+- **平台級訊息**（App.vue `handleCastMessage` 處理）：
   - 載入遊戲：`{ action: 'LOAD_GAME', gameId: 'squat_jump' }`
   - 返回大廳：`{ action: 'RETURN_LOBBY' }`
   - 查詢狀態：`{ action: 'QUERY_STATE' }`
+  - LOBBY 導航：`{ action: 'NAVIGATE_LEFT' }` / `{ action: 'NAVIGATE_RIGHT' }` / `{ action: 'SELECT_GAME' }`
 - **遊戲級訊息**（轉發給 activeGame.handleMessage）：
   - 玩家加入：`{ action: 'PLAYER_JOIN', playerId: 'xxx', playerName: 'Alice' }`
   - 玩家離開：`{ action: 'PLAYER_LEAVE', playerId: 'xxx' }`
   - 跳躍：`{ action: 'SQUAT_JUMP', playerId: 'xxx' }`
+  - 搖晃：`{ action: 'SHAKE', playerId: 'xxx' }`
   - 開始/重新開始：`{ action: 'START_GAME' }`
-- 無 Cast SDK 時自動降級為本地測試模式
+  - 提交結果：`{ action: 'GAME_RESULT', playerId, score, details }`
+- **Receiver → Sender 廣播**：
+  - `{ type: 'PLATFORM_STATE', state: 'LOBBY' | 'GAME_ACTIVE', gameId?, gameState? }`
+  - `{ type: 'LOBBY_STATE', games: GameInfoSlim[], selectedIndex: number }`
+  - `{ type: 'STATE_UPDATE', state: GameState }` — 遊戲模組內部廣播
+  - `{ type: 'JOIN_RESULT', success, reason? }` / `{ type: 'REQUEST_RESULTS' }` / `{ type: 'GAME_RESULTS', rankings }`
+- **LobbyScreen 遙控**：App.vue 透過 `defineExpose` + template ref 呼叫 `navigateLeft/Right`、`getSelectedIndex/GameId`
 
 ### Sender App（Flutter）
-- 獨立專案 `cast_squat_sender/`，使用 **官方 Google Cast SDK**
+- 獨立專案位於 `/Users/kentchiu/Desktop/flutter/cast_squat_sender/`
+- 使用 **官方 Google Cast SDK**
 - 透過 **Method Channel** (`com.example.castsquat/cast`) 橋接 Flutter ↔ Native
 - 透過 **Event Channel** (`com.example.castsquat/cast_events`) 接收裝置和連線事件
 - Android：Cast SDK 21.5.0 + `CastContext.getSharedInstance()` 非同步初始化
 - iOS：google-cast-sdk-no-bluetooth 4.8 + `GCKDiscoveryManager`
+- **連線後自動 `QUERY_STATE`**，收到 `LOBBY_STATE` 後顯示遙控導航 UI（左右箭頭 + 遊戲資訊 + PLAY）
+- Fallback：Receiver 未回傳 `LOBBY_STATE` 時顯示硬編碼遊戲卡片
 
 ## Performance Notes（Chromecast v3 優化）
 
@@ -302,9 +316,15 @@ MULTIPLAYER_CONFIG = {
 4. START_SCREEN → 點擊 START GAME → 3-2-1 倒數
 5. 點擊 JUMP! 測試跳躍、特效、金幣收集
 
-### Console 多人模擬
+### Console 測試
 ```javascript
-// 進入遊戲後，開啟 Console
+// === LOBBY 導航測試 ===
+gameAPI.handleCastMessage({ action: 'NAVIGATE_RIGHT' })
+gameAPI.handleCastMessage({ action: 'NAVIGATE_LEFT' })
+gameAPI.handleCastMessage({ action: 'SELECT_GAME' })
+gameAPI.getLobbyState()
+
+// === 多人模擬（進入遊戲後）===
 gameAPI.handleCastMessage({ action: 'PLAYER_JOIN', playerId: 'p1', playerName: 'Alice' })
 gameAPI.handleCastMessage({ action: 'PLAYER_JOIN', playerId: 'p2', playerName: 'Bob' })
 
@@ -320,7 +340,7 @@ gameAPI.returnToLobby()
 
 ### 單元測試
 ```bash
-npm test         # vitest run（74 個測試）
+npm test         # vitest run（103 個測試）
 npm run test:watch  # vitest watch 模式
 ```
 
