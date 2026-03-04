@@ -90,8 +90,8 @@
     </div>
 
     <!-- 角色吉祥物 -->
-    <canvas ref="mascotLeftRef" class="mascot mascot-left" width="480" height="520"></canvas>
-    <canvas ref="mascotRightRef" class="mascot mascot-right" width="480" height="520"></canvas>
+    <canvas ref="mascotLeftRef" class="mascot mascot-left" width="240" height="260"></canvas>
+    <canvas ref="mascotRightRef" class="mascot mascot-right" width="240" height="260"></canvas>
 
     <!-- 草地 -->
     <div class="ground"></div>
@@ -114,9 +114,9 @@ const mascotLeftRef = ref<HTMLCanvasElement | null>(null)
 const mascotRightRef = ref<HTMLCanvasElement | null>(null)
 let mascotAnimId = 0
 
-const MASCOT_SIZE = 360
-const MASCOT_CANVAS_W = 480
-const MASCOT_CANVAS_H = 520
+const MASCOT_SIZE = 180
+const MASCOT_CANVAS_W = 240
+const MASCOT_CANVAS_H = 260
 
 // === 行為類型 ===
 type MascotAction = 'idle' | 'jump' | 'look' | 'nod'
@@ -267,8 +267,8 @@ function drawMascot(
   const body = standardSprites['BODY']!
   const face = standardSprites[state.faceKey]!
 
-  const bobOffset = Math.sin(t * 0.03) * 4 - state.jumpY
-  const swayOffset = Math.sin(t * 0.02) * 2
+  const bobOffset = Math.sin(t * 0.03) * 2 - state.jumpY * 0.5
+  const swayOffset = Math.sin(t * 0.02) * 1
   const scaleX = 1 + Math.sin(t * 0.04) * 0.03
   const scaleY = 1 - Math.sin(t * 0.04) * 0.03
 
@@ -279,15 +279,15 @@ function drawMascot(
 
   ctx.clearRect(0, 0, MASCOT_CANVAS_W, MASCOT_CANVAS_H)
   ctx.save()
-  ctx.translate(MASCOT_CANVAS_W / 2 + swayOffset, MASCOT_CANVAS_H - 10 + bobOffset)
+  ctx.translate(MASCOT_CANVAS_W / 2 + swayOffset, MASCOT_CANVAS_H - 5 + bobOffset)
   ctx.rotate(state.nodAngle)
   ctx.scale(scaleX * baseDir * dirFlip, scaleY)
 
   // Face background（黑色底層，在 body 後面）
-  const faceH = 135
+  const faceH = 68
   const faceW = faceH * (face.w / face.h)
   const faceX = -faceW / 2
-  const faceY = -MASCOT_SIZE + 45
+  const faceY = -MASCOT_SIZE + 22
   if (needFaceBackground) {
     ctx.fillStyle = '#000'
     ctx.beginPath()
@@ -737,8 +737,11 @@ defineExpose({
 .mascot {
   position: absolute;
   bottom: 40px;
+  width: 240px;
+  height: 260px;
   z-index: 2;
   pointer-events: none;
+  image-rendering: pixelated;
 }
 
 .mascot-left {
