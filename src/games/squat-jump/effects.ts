@@ -1,6 +1,7 @@
-import { SPRITES, SCENE_CONFIG, EFFECTS_CONFIG } from './constants'
+import { CHAR_SPRITES, SCENE_CONFIG, EFFECTS_CONFIG } from './constants'
 import type { SquashStretch } from '../../types/game'
 import { randomRange } from './utils'
+import { getColoredSheet } from './sprite-cache'
 
 // === 殘影型別 ===
 interface AfterImage {
@@ -9,6 +10,8 @@ interface AfterImage {
   scaleY: number
   alpha: number
   playerX: number | null
+  charIndex: number
+  colorIndex: number
 }
 
 // === 速度線型別 ===
@@ -48,6 +51,8 @@ export function createAfterImage(
   characterY: number,
   squashStretch: SquashStretch,
   playerX?: number | null,
+  charIndex: number = 0,
+  colorIndex: number = 0,
 ): void {
   if (afterImages.length >= EFFECTS_CONFIG.MAX_AFTER_IMAGES) {
     afterImages.shift()
@@ -58,6 +63,8 @@ export function createAfterImage(
     scaleY: squashStretch.scaleY,
     alpha: EFFECTS_CONFIG.AFTER_IMAGE_INITIAL_ALPHA,
     playerX: playerX ?? null,
+    charIndex,
+    colorIndex,
   })
 }
 
@@ -70,14 +77,14 @@ export function updateAfterImages(): void {
 
 export function drawAfterImages(
   ctx: CanvasRenderingContext2D,
-  spritesheet: CanvasImageSource,
   canvasWidth: number,
   canvasHeight: number,
 ): void {
-  const body = SPRITES.BODY
+  const body = CHAR_SPRITES.BODY
   const baseSize = SCENE_CONFIG.BASE_SIZE
 
   for (const img of afterImages) {
+    const sheet = getColoredSheet(img.charIndex, img.colorIndex)
     const charRenderWidth = baseSize * img.scaleX
     const charRenderHeight = baseSize * img.scaleY
     const charRenderBottom =
@@ -88,7 +95,7 @@ export function drawAfterImages(
     ctx.globalAlpha = img.alpha * 0.4
     ctx.translate(charCenterX, charRenderBottom - charRenderHeight / 2)
     ctx.drawImage(
-      spritesheet,
+      sheet,
       body.x,
       body.y,
       body.w,

@@ -1,7 +1,8 @@
 import type { GameModule, GameState, CastMessageData, BroadcastFn, ReplyFn } from '../../types/game'
 import { GAME_DURATION, SCENE_CONFIG } from './constants'
 import {
-  initColoredSpritesheets,
+  initCharacterSprites,
+  destroyCharacterSprites,
   resetCharacter,
   updateJump,
   startJump,
@@ -36,6 +37,7 @@ import {
   getPlayerPositions,
   triggerPlayerJump,
   getLeaderboard,
+  setCharacterCount,
 } from './players'
 import {
   createGameDOM,
@@ -56,7 +58,7 @@ let squatCount = 0
 let timer = GAME_DURATION
 let countdownInterval: ReturnType<typeof setInterval> | null = null
 let finalScore = 0
-let _spritesheet: HTMLImageElement | null = null
+let _itemSpritesheet: HTMLImageElement | null = null
 let _broadcastFn: BroadcastFn | null = null
 let _replyFn: ReplyFn | null = null
 let _returnToLobbyFn: (() => void) | null = null
@@ -258,12 +260,11 @@ function drawStartScreen(): void {
 
 function drawCountdownScreen(ctx: CanvasRenderingContext2D): void {
   drawFloor(ctx)
-  if (!_spritesheet) return
 
   if (isMultiplayerMode()) {
-    drawPlayersStatic(ctx, _spritesheet, getPlayers(), logicalWidth, logicalHeight)
+    drawPlayersStatic(ctx, getPlayers(), logicalWidth, logicalHeight)
   } else {
-    drawStaticCharacter(ctx, _spritesheet, logicalWidth, logicalHeight)
+    drawStaticCharacter(ctx, logicalWidth, logicalHeight)
   }
 }
 
@@ -275,27 +276,25 @@ function renderPlayingScreen(ctx: CanvasRenderingContext2D): void {
   ctx.translate(screenShake.x, screenShake.y)
 
   drawFloor(ctx)
-  if (!_spritesheet) {
-    ctx.restore()
-    return
-  }
 
   drawSpeedLines(ctx)
-  if (isMultiplayerMode()) {
-    drawPlayerCoins(ctx, _spritesheet)
-  } else {
-    drawCoins(ctx, _spritesheet)
+  if (_itemSpritesheet) {
+    if (isMultiplayerMode()) {
+      drawPlayerCoins(ctx, _itemSpritesheet)
+    } else {
+      drawCoins(ctx, _itemSpritesheet)
+    }
   }
-  drawAfterImages(ctx, _spritesheet, logicalWidth, logicalHeight)
+  drawAfterImages(ctx, logicalWidth, logicalHeight)
 
   if (isMultiplayerMode()) {
     const players = getPlayers()
     const positions = getPlayerPositions(logicalWidth)
     for (let i = 0; i < players.length; i++) {
-      drawPlayerCharacter(ctx, _spritesheet, players[i]!, positions[i]!, logicalHeight)
+      drawPlayerCharacter(ctx, players[i]!, positions[i]!, logicalHeight)
     }
   } else {
-    drawCharacter(ctx, _spritesheet, logicalWidth, logicalHeight)
+    drawCharacter(ctx, logicalWidth, logicalHeight)
   }
 
   drawParticles(ctx)
@@ -349,12 +348,13 @@ const SquatJumpGame: GameModule = {
   id: 'squat_jump',
   name: 'Squat Jump',
 
-  init(_canvas, _ctx, spritesheet, domContainer) {
-    _spritesheet = spritesheet
+  init(_canvas, _ctx, characterSheets, itemSpritesheet, domContainer) {
+    _itemSpritesheet = itemSpritesheet
     logicalWidth = globalThis.innerWidth
     logicalHeight = globalThis.innerHeight
 
-    initColoredSpritesheets(spritesheet)
+    initCharacterSprites(characterSheets)
+    setCharacterCount(characterSheets.filter(Boolean).length)
     createGameDOM(domContainer, handleAction)
 
     globalThis.addEventListener('resize', handleResize)
@@ -385,11 +385,13 @@ const SquatJumpGame: GameModule = {
     destroyGameDOM()
     globalThis.removeEventListener('resize', handleResize)
 
+    destroyCharacterSprites()
+
     gameState = 'START_SCREEN'
     squatCount = 0
     timer = GAME_DURATION
     finalScore = 0
-    _spritesheet = null
+    _itemSpritesheet = null
     _broadcastFn = null
     _replyFn = null
     _returnToLobbyFn = null

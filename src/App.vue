@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, provide, onMounted, onUnmounted } from 'vue'
 import LobbyScreen from './components/LobbyScreen.vue'
 import type { GameModule, PlatformState } from './types/game'
 import { getGameById } from './game-registry'
@@ -30,13 +30,74 @@ const fps = ref(0)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const textLayerRef = ref<HTMLElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
-let spritesheet: HTMLImageElement | null = null
+const characterSheets = shallowRef<HTMLImageElement[]>([])
+let itemSpritesheet: HTMLImageElement | null = null
+
+// === 精靈圖標準佈局座標（= 熊的座標，遊戲程式碼的 CHAR_SPRITES）===
+interface SpriteRect { x: number; y: number; w: number; h: number }
+const STANDARD_SPRITES: Record<string, SpriteRect> = {
+  BODY:           { x: 30,   y: 10,  w: 310, h: 360 },
+  SHADOW:         { x: 1220, y: 140, w: 200, h: 90 },
+  FACE_IDLE:      { x: 15,   y: 470, w: 220, h: 190 },
+  FACE_CALM:      { x: 250,  y: 470, w: 220, h: 190 },
+  FACE_SURPRISED: { x: 500,  y: 470, w: 220, h: 190 },
+  FACE_FOCUSED:   { x: 740,  y: 470, w: 220, h: 190 },
+  FACE_NERVOUS:   { x: 980,  y: 470, w: 220, h: 190 },
+  FACE_PAIN:      { x: 1220, y: 470, w: 220, h: 190 },
+}
+const STANDARD_WIDTH = 1456
+const STANDARD_HEIGHT = 720
+
+// === 角色配置（路徑 + 來源座標，null = 已是標準佈局）===
+const CHARACTER_CONFIGS: { path: string; sourceSprites: Record<string, SpriteRect> | null }[] = [
+  { path: 'characters/bear.png', sourceSprites: null },
+  { path: 'characters/sheep.png', sourceSprites: {
+    BODY:           { x: 60,   y: 20,  w: 310, h: 360 },
+    SHADOW:         { x: 1230, y: 290, w: 220, h: 90 },
+    FACE_IDLE:      { x: 85,   y: 450, w: 220, h: 190 },
+    FACE_CALM:      { x: 320,  y: 450, w: 220, h: 190 },
+    FACE_SURPRISED: { x: 550,  y: 450, w: 220, h: 190 },
+    FACE_FOCUSED:   { x: 780,  y: 450, w: 220, h: 190 },
+    FACE_NERVOUS:   { x: 1010, y: 450, w: 220, h: 190 },
+    FACE_PAIN:      { x: 1240, y: 450, w: 220, h: 190 },
+  }},
+]
+
+// === 精靈圖正規化（將來源座標映射到標準座標）===
+function normalizeSheet(
+  sourceImg: HTMLImageElement,
+  sourceSprites: Record<string, SpriteRect>,
+): Promise<HTMLImageElement> {
+  const canvas = document.createElement('canvas')
+  canvas.width = STANDARD_WIDTH
+  canvas.height = STANDARD_HEIGHT
+  const offCtx = canvas.getContext('2d')!
+
+  for (const [key, stdRect] of Object.entries(STANDARD_SPRITES)) {
+    const srcRect = sourceSprites[key]
+    if (!srcRect) continue
+    offCtx.drawImage(sourceImg,
+      srcRect.x, srcRect.y, srcRect.w, srcRect.h,
+      stdRect.x, stdRect.y, stdRect.w, stdRect.h,
+    )
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.src = canvas.toDataURL('image/png')
+  })
+}
+
+// === 提供給子元件 ===
+provide('characterSheets', characterSheets)
+provide('standardSprites', STANDARD_SPRITES)
 
 // === 當前遊戲 ===
 let activeGame: GameModule | null = null
 
 // === Canvas 尺寸 ===
-const CANVAS_SCALE = 0.5
+const CANVAS_SCALE = 1
 let logicalWidth = 0
 let logicalHeight = 0
 
@@ -73,7 +134,7 @@ function resizeCanvas() {
   canvas.style.height = logicalHeight + 'px'
 
   if (ctx) {
-    ctx.imageSmoothingEnabled = false
+    ctx.imageSmoothingEnabled = true
     ctx.setTransform(CANVAS_SCALE, 0, 0, CANVAS_SCALE, 0, 0)
   }
 }
@@ -155,12 +216,13 @@ function updateFPS() {
 // === 遊戲選擇 ===
 async function handleGameSelect(gameId: string) {
   const gameInfo = getGameById(gameId)
-  if (!gameInfo?.module || !canvasRef.value || !ctx || !spritesheet || !textLayerRef.value) return
+  if (!gameInfo?.module || !canvasRef.value || !ctx || !textLayerRef.value) return
+  if (characterSheets.value.filter(Boolean).length === 0) return
 
   const mod = await gameInfo.module()
   activeGame = mod.default
 
-  activeGame.init(canvasRef.value, ctx, spritesheet, textLayerRef.value)
+  activeGame.init(canvasRef.value, ctx, characterSheets.value, itemSpritesheet, textLayerRef.value)
   activeGame.setBroadcastCallbacks(
     (data) => console.log('[Broadcast]', JSON.stringify(data)),
     (senderId, data) => console.log(`[Reply to ${senderId}]`, JSON.stringify(data)),
@@ -187,15 +249,38 @@ onMounted(() => {
 
   ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.imageSmoothingEnabled = false
+    ctx.imageSmoothingEnabled = true
   }
 
-  // 載入精靈圖
-  spritesheet = new Image()
-  spritesheet.src = 'kenney_shape-characters/Spritesheet/spritesheet_default.png'
-  spritesheet.onload = () => {
-    console.log('精靈圖已載入')
-  }
+  // 載入角色精靈圖（並行載入 → 正規化座標）
+  const sheets: HTMLImageElement[] = []
+  const charLoadPromises = CHARACTER_CONFIGS.map((config, index) => {
+    return new Promise<void>((resolve) => {
+      const img = new Image()
+      img.src = config.path
+      img.onload = async () => {
+        if (config.sourceSprites) {
+          sheets[index] = await normalizeSheet(img, config.sourceSprites)
+        } else {
+          sheets[index] = img
+        }
+        resolve()
+      }
+      img.onerror = () => {
+        console.warn(`角色精靈圖載入失敗: ${config.path}`)
+        resolve()
+      }
+    })
+  })
+
+  // 載入物品精靈圖（金幣等）
+  itemSpritesheet = new Image()
+  itemSpritesheet.src = 'kenney_shape-characters/Spritesheet/spritesheet_default.png'
+
+  Promise.all(charLoadPromises).then(() => {
+    characterSheets.value = sheets
+    console.log(`${sheets.filter(Boolean).length} 張角色精靈圖已載入`)
+  })
 
   // Canvas resize
   window.addEventListener('resize', resizeCanvas)
@@ -244,8 +329,6 @@ body {
 
 #gameCanvas {
   display: block;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 
 #textLayer {

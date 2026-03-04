@@ -82,12 +82,16 @@
       <button
         v-if="selectedGame.available"
         class="play-btn"
-        @click="emit('selectGame', selectedGame.id)"
+        @click="selectGameWithReaction(selectedGame.id)"
       >
         PLAY
       </button>
       <div v-else class="coming-soon">COMING SOON</div>
     </div>
+
+    <!-- 角色吉祥物 -->
+    <canvas ref="mascotLeftRef" class="mascot mascot-left" width="480" height="520"></canvas>
+    <canvas ref="mascotRightRef" class="mascot mascot-right" width="480" height="520"></canvas>
 
     <!-- 草地 -->
     <div class="ground"></div>
@@ -95,11 +99,244 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, type ShallowRef } from 'vue'
 import { GAMES } from '../game-registry'
 import GameCard from './GameCard.vue'
 
 const games = GAMES
+
+// === 角色吉祥物 ===
+interface SpriteRect { x: number; y: number; w: number; h: number }
+const characterSheets = inject<ShallowRef<HTMLImageElement[]>>('characterSheets')!
+const standardSprites = inject<Record<string, SpriteRect>>('standardSprites')!
+
+const mascotLeftRef = ref<HTMLCanvasElement | null>(null)
+const mascotRightRef = ref<HTMLCanvasElement | null>(null)
+let mascotAnimId = 0
+
+const MASCOT_SIZE = 360
+const MASCOT_CANVAS_W = 480
+const MASCOT_CANVAS_H = 520
+
+// === 行為類型 ===
+type MascotAction = 'idle' | 'jump' | 'look' | 'nod'
+
+interface MascotState {
+  timer: number
+  faceKey: string
+  phaseOffset: number
+  // 行為系統
+  action: MascotAction
+  actionTimer: number
+  actionDuration: number
+  nextActionAt: number
+  // 跳躍
+  jumpY: number
+  jumpVelocity: number
+  // 看對方
+  flipX: boolean
+  // 打瞌睡
+  nodAngle: number
+}
+
+function createMascotState(phaseOffset: number): MascotState {
+  return {
+    timer: 0,
+    faceKey: 'FACE_IDLE',
+    phaseOffset,
+    action: 'idle',
+    actionTimer: 0,
+    actionDuration: 0,
+    nextActionAt: 180 + Math.floor(Math.random() * 180),
+    jumpY: 0,
+    jumpVelocity: 0,
+    flipX: false,
+    nodAngle: 0,
+  }
+}
+
+function triggerAction(state: MascotState, action: MascotAction): void {
+  state.action = action
+  state.actionTimer = 0
+  switch (action) {
+    case 'jump':
+      state.actionDuration = 40
+      state.jumpVelocity = 12
+      state.faceKey = 'FACE_SURPRISED'
+      break
+    case 'look':
+      state.actionDuration = 120
+      state.flipX = true
+      state.faceKey = 'FACE_CALM'
+      break
+    case 'nod':
+      state.actionDuration = 150
+      state.faceKey = 'FACE_IDLE'
+      break
+  }
+}
+
+const RANDOM_ACTIONS: MascotAction[] = ['jump', 'look', 'nod']
+
+function updateMascotState(state: MascotState): void {
+  state.timer++
+  state.actionTimer++
+
+  switch (state.action) {
+    case 'idle':
+      // 等待下一個隨機行為
+      if (state.timer >= state.nextActionAt) {
+        const action = RANDOM_ACTIONS[Math.floor(Math.random() * RANDOM_ACTIONS.length)]!
+        triggerAction(state, action)
+      }
+      break
+
+    case 'jump':
+      // 跳躍物理
+      state.jumpY += state.jumpVelocity
+      state.jumpVelocity -= 0.6
+      if (state.jumpY <= 0) {
+        state.jumpY = 0
+        state.jumpVelocity = 0
+      }
+      if (state.actionTimer >= state.actionDuration) {
+        state.action = 'idle'
+        state.faceKey = 'FACE_IDLE'
+        state.jumpY = 0
+        state.nextActionAt = state.timer + 180 + Math.floor(Math.random() * 240)
+      }
+      break
+
+    case 'look':
+      // 看對方，停留後轉回
+      if (state.actionTimer >= state.actionDuration) {
+        state.action = 'idle'
+        state.flipX = false
+        state.faceKey = 'FACE_IDLE'
+        state.nextActionAt = state.timer + 180 + Math.floor(Math.random() * 240)
+      }
+      break
+
+    case 'nod':
+      // 打瞌睡：前傾 → 彈回
+      if (state.actionTimer < 90) {
+        // 慢慢前傾
+        state.nodAngle = Math.sin(state.actionTimer * 0.035) * 0.15
+        if (state.actionTimer > 60) {
+          state.faceKey = 'FACE_PAIN' // 快睡著
+        }
+      } else if (state.actionTimer === 90) {
+        // 嚇醒！
+        state.nodAngle = -0.08
+        state.faceKey = 'FACE_SURPRISED'
+      } else {
+        // 恢復
+        state.nodAngle *= 0.85
+      }
+      if (state.actionTimer >= state.actionDuration) {
+        state.action = 'idle'
+        state.nodAngle = 0
+        state.faceKey = 'FACE_IDLE'
+        state.nextActionAt = state.timer + 180 + Math.floor(Math.random() * 240)
+      }
+      break
+  }
+}
+
+// === 外部觸發：選擇遊戲時兩隻一起跳，延遲後進入遊戲 ===
+const REACTION_DELAY = 800 // ms，讓跳躍動畫播完再切換
+let reactionTimeout = 0
+
+function selectGameWithReaction(gameId: string): void {
+  triggerAction(leftState, 'jump')
+  triggerAction(rightState, 'jump')
+  clearTimeout(reactionTimeout)
+  reactionTimeout = globalThis.setTimeout(() => {
+    emit('selectGame', gameId)
+  }, REACTION_DELAY)
+}
+
+function drawMascot(
+  ctx: CanvasRenderingContext2D,
+  sheet: HTMLImageElement,
+  state: MascotState,
+  needFaceBackground: boolean,
+  facingRight: boolean,
+): void {
+  const t = state.timer + state.phaseOffset
+  const body = standardSprites['BODY']!
+  const face = standardSprites[state.faceKey]!
+
+  const bobOffset = Math.sin(t * 0.03) * 4 - state.jumpY
+  const swayOffset = Math.sin(t * 0.02) * 2
+  const scaleX = 1 + Math.sin(t * 0.04) * 0.03
+  const scaleY = 1 - Math.sin(t * 0.04) * 0.03
+
+  // 看對方時翻轉方向
+  const dirFlip = state.flipX ? -1 : 1
+  // 左邊角色預設朝右(1)，右邊角色預設朝左(-1)
+  const baseDir = facingRight ? 1 : -1
+
+  ctx.clearRect(0, 0, MASCOT_CANVAS_W, MASCOT_CANVAS_H)
+  ctx.save()
+  ctx.translate(MASCOT_CANVAS_W / 2 + swayOffset, MASCOT_CANVAS_H - 10 + bobOffset)
+  ctx.rotate(state.nodAngle)
+  ctx.scale(scaleX * baseDir * dirFlip, scaleY)
+
+  // Face background（黑色底層，在 body 後面）
+  const faceH = 135
+  const faceW = faceH * (face.w / face.h)
+  const faceX = -faceW / 2
+  const faceY = -MASCOT_SIZE + 45
+  if (needFaceBackground) {
+    ctx.fillStyle = '#000'
+    ctx.beginPath()
+    ctx.ellipse(0, faceY + faceH / 2, faceW * 0.48, faceH * 0.48, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Body
+  ctx.drawImage(
+    sheet,
+    body.x, body.y, body.w, body.h,
+    -MASCOT_SIZE / 2, -MASCOT_SIZE, MASCOT_SIZE, MASCOT_SIZE,
+  )
+  ctx.drawImage(
+    sheet,
+    face.x, face.y, face.w, face.h,
+    faceX, faceY, faceW, faceH,
+  )
+
+  ctx.restore()
+}
+
+const leftState = createMascotState(0)
+const rightState = createMascotState(100)
+
+// 每 3 幀更新一次（約 20fps），降低 Chromecast v3 負擔
+const MASCOT_FRAME_SKIP = 3
+let mascotFrameCount = 0
+
+function mascotLoop(): void {
+  mascotAnimId = requestAnimationFrame(mascotLoop)
+  mascotFrameCount++
+  if (mascotFrameCount % MASCOT_FRAME_SKIP !== 0) return
+
+  const sheets = characterSheets.value
+  if (sheets.length < 2) return
+
+  const leftCtx = mascotLeftRef.value?.getContext('2d')
+  const rightCtx = mascotRightRef.value?.getContext('2d')
+
+  if (leftCtx && sheets[0]) {
+    updateMascotState(leftState)
+    drawMascot(leftCtx, sheets[0], leftState, false, true)
+  }
+  if (rightCtx && sheets[1]) {
+    updateMascotState(rightState)
+    drawMascot(rightCtx, sheets[1], rightState, true, false)
+  }
+}
 
 const emit = defineEmits<{
   selectGame: [gameId: string]
@@ -138,7 +375,7 @@ function onKeydown(e: KeyboardEvent) {
     case 'Enter':
     case ' ': {
       const game = games[selectedIndex.value]!
-      if (game.available) emit('selectGame', game.id)
+      if (game.available) selectGameWithReaction(game.id)
       break
     }
   }
@@ -147,11 +384,14 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('resize', onResize)
   globalThis.addEventListener('keydown', onKeydown)
+  mascotAnimId = requestAnimationFrame(mascotLoop)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   globalThis.removeEventListener('keydown', onKeydown)
+  cancelAnimationFrame(mascotAnimId)
+  clearTimeout(reactionTimeout)
 })
 
 // === 旗幟垂墜曲線（兩段弧線，每段 8 面旗）===
@@ -167,9 +407,7 @@ function flagDroop(index: number): number {
 function handleCardClick(index: number) {
   if (index === selectedIndex.value) {
     const game = games[index]!
-    if (game.available) {
-      emit('selectGame', game.id)
-    }
+    if (game.available) selectGameWithReaction(game.id)
   } else {
     selectedIndex.value = index
   }
@@ -481,6 +719,22 @@ function handleCardClick(index: number) {
 @keyframes flagSwingB {
   0%, 100% { transform: rotate(3deg); }
   50% { transform: rotate(-3deg); }
+}
+
+/* === 角色吉祥物 === */
+.mascot {
+  position: absolute;
+  bottom: 40px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.mascot-left {
+  left: 5%;
+}
+
+.mascot-right {
+  right: 5%;
 }
 
 /* === 草地 === */

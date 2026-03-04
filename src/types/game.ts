@@ -3,7 +3,7 @@ export interface GameModule {
   id: string
   name: string
 
-  init(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, spritesheet: HTMLImageElement, domContainer: HTMLElement): void
+  init(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, characterSheets: HTMLImageElement[], itemSpritesheet: HTMLImageElement | null, domContainer: HTMLElement): void
   start(): void
   stop(): void
   destroy(): void
@@ -61,6 +61,7 @@ export type ReplyFn = (senderId: string, data: Record<string, unknown>) => void
 export interface Player {
   id: string
   name: string
+  characterIndex: number
   colorIndex: number
   squatCount: number
   coinScore: number
@@ -88,6 +89,7 @@ export interface SquashStretch {
 export interface ShakePlayer {
   id: string
   name: string
+  characterIndex: number
   colorIndex: number
   score: number
   hasSubmitted: boolean
@@ -98,4 +100,12 @@ export interface PlayerColor {
   name: string
   hex: string
   hueRotation: number
+}
+
+// === 精靈圖矩形 ===
+export interface SpriteRect {
+  x: number
+  y: number
+  w: number
+  h: number
 }

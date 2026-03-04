@@ -1,5 +1,5 @@
 import type { Player, SquashStretch } from '../../types/game'
-import { COIN_CONFIG, MP_COIN_CONFIG, SPRITES, SCENE_CONFIG, COIN_ANIM_CONFIG } from './constants'
+import { COIN_CONFIG, MP_COIN_CONFIG, ITEM_SPRITES, SCENE_CONFIG, COIN_ANIM_CONFIG } from './constants'
 import { randomRange, circleCollision } from './utils'
 import { createCoinCollectParticles } from './particles'
 
@@ -108,7 +108,7 @@ export function updateCoins(
 
 // === 繪製金幣（單人）===
 export function drawCoins(ctx: CanvasRenderingContext2D, spritesheet: CanvasImageSource): void {
-  const coinSprite = SPRITES.COIN
+  const coinSprite = ITEM_SPRITES.COIN
   const halfSize = COIN_CONFIG.SIZE / 2
 
   for (const coin of coins) {
@@ -191,7 +191,7 @@ export function updateCoinsMultiplayer(
 
 // === 繪製金幣（多人）===
 export function drawPlayerCoins(ctx: CanvasRenderingContext2D, spritesheet: CanvasImageSource): void {
-  const coinSprite = SPRITES.COIN
+  const coinSprite = ITEM_SPRITES.COIN
   const halfSize = MP_COIN_CONFIG.SIZE / 2
 
   for (const coin of playerCoins) {

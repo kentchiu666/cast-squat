@@ -1,40 +1,25 @@
-import type { JumpState, Player, SquashStretch } from '../../types/game'
+import type { JumpState, Player, SquashStretch, SpriteRect } from '../../types/game'
 import {
   JUMP_PHASE,
   JUMP_CONFIG,
-  SPRITES,
+  CHAR_SPRITES,
   SCENE_CONFIG,
   PLAYER_COLORS,
   MULTIPLAYER_CONFIG,
   CHARACTER_ANIM_CONFIG,
 } from './constants'
-import type { SpriteRect } from './constants'
 import { easeOutBack } from './utils'
 import { createLandingParticles } from './particles'
 import { createSpeedLines, createAfterImage, triggerScreenShake } from './effects'
+import { initSpriteCache, getColoredSheet, clearSpriteCache } from './sprite-cache'
 
-// === 預渲染彩色精靈圖快取 ===
-const coloredSpritesheets = new Map<number, CanvasImageSource>()
-
-export function initColoredSpritesheets(spritesheet: HTMLImageElement): void {
-  coloredSpritesheets.clear()
-  coloredSpritesheets.set(0, spritesheet)
-
-  for (let index = 0; index < PLAYER_COLORS.length; index++) {
-    const color = PLAYER_COLORS[index]!
-    if (color.hueRotation === 0) continue
-    const offscreen = document.createElement('canvas')
-    offscreen.width = spritesheet.width
-    offscreen.height = spritesheet.height
-    const offCtx = offscreen.getContext('2d')!
-    offCtx.filter = `hue-rotate(${color.hueRotation}deg)`
-    offCtx.drawImage(spritesheet, 0, 0)
-    coloredSpritesheets.set(index, offscreen)
-  }
+// === 初始化 ===
+export function initCharacterSprites(characterSheets: HTMLImageElement[]): void {
+  initSpriteCache(characterSheets, PLAYER_COLORS)
 }
 
-function getColoredSpritesheet(colorIndex: number): CanvasImageSource {
-  return coloredSpritesheets.get(colorIndex) ?? coloredSpritesheets.get(0)!
+export function destroyCharacterSprites(): void {
+  clearSpriteCache()
 }
 
 // === 單人跳躍狀態（使用 JumpState 物件）===
@@ -217,56 +202,24 @@ export function updatePlayerJump(
   updateJumpState(player.jumpState, canvasWidth, canvasHeight, playerX, MULTIPLAYER_CONFIG.SHAKE_INTENSITY)
 }
 
-// === 角色部件（表情+手部）===
-interface CharacterParts {
-  face: SpriteRect
-  hand: SpriteRect
-  handAngle: { left: number; right: number }
-}
-
-function getPartsForPhase(phase: string): CharacterParts {
+// === 跳躍階段對應表情 ===
+function getFaceForPhase(phase: string): SpriteRect {
   switch (phase) {
     case JUMP_PHASE.ANTICIPATION:
-      return { face: SPRITES.FACE_ANTICIPATION, hand: SPRITES.HAND_CLOSED, handAngle: { left: 0.8, right: -0.8 } }
+      return CHAR_SPRITES.FACE_FOCUSED
     case JUMP_PHASE.RISE:
-      return { face: SPRITES.FACE_RISE, hand: SPRITES.HAND_OPEN, handAngle: { left: -1.2, right: 1.2 } }
+      return CHAR_SPRITES.FACE_SURPRISED
     case JUMP_PHASE.HANG:
-      return { face: SPRITES.FACE_HANG, hand: SPRITES.HAND_PEACE, handAngle: { left: -1.5, right: 1.5 } }
+      return CHAR_SPRITES.FACE_CALM
     case JUMP_PHASE.FALL:
-      return { face: SPRITES.FACE_FALL, hand: SPRITES.HAND_OPEN, handAngle: { left: -0.5, right: 0.5 } }
+      return CHAR_SPRITES.FACE_NERVOUS
     case JUMP_PHASE.LAND:
-      return { face: SPRITES.FACE_LAND, hand: SPRITES.HAND_CLOSED, handAngle: { left: 0.5, right: -0.5 } }
+      return CHAR_SPRITES.FACE_PAIN
     case JUMP_PHASE.RECOVER:
-      return { face: SPRITES.FACE_IDLE, hand: SPRITES.HAND_ROCK, handAngle: { left: -0.8, right: 0.8 } }
+      return CHAR_SPRITES.FACE_IDLE
     default:
-      return { face: SPRITES.FACE_IDLE, hand: SPRITES.HAND_CLOSED, handAngle: { left: 0.3, right: -0.3 } }
+      return CHAR_SPRITES.FACE_IDLE
   }
-}
-
-// === 繪製手部 ===
-function drawHand(
-  ctx: CanvasRenderingContext2D,
-  sheet: CanvasImageSource,
-  handSprite: SpriteRect,
-  x: number,
-  y: number,
-  angle: number,
-  isLeft: boolean,
-): void {
-  const handScale = CHARACTER_ANIM_CONFIG.HAND_SCALE
-  const handWidth = handSprite.w * handScale
-  const handHeight = handSprite.h * handScale
-
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.rotate(angle)
-  if (isLeft) ctx.scale(-1, 1)
-  ctx.drawImage(
-    sheet,
-    handSprite.x, handSprite.y, handSprite.w, handSprite.h,
-    -handWidth / 2, -handHeight / 2, handWidth, handHeight,
-  )
-  ctx.restore()
 }
 
 // === 繪製角色陰影 ===
@@ -289,8 +242,8 @@ function drawCharacterShadow(
 
 // === 繪製角色（共用核心）===
 interface DrawCharacterParams {
-  bodySheet: CanvasImageSource
-  faceSheet: CanvasImageSource
+  charIndex: number
+  colorIndex: number
   phase: string
   ss: SquashStretch
   charY: number
@@ -299,10 +252,13 @@ interface DrawCharacterParams {
 }
 
 function drawCharacterCore(ctx: CanvasRenderingContext2D, p: DrawCharacterParams): void {
-  const { bodySheet, faceSheet, phase, ss, charY, centerX, canvasHeight } = p
-  const { face: currentFace, hand: currentHand, handAngle } = getPartsForPhase(phase)
-  const body = SPRITES.BODY
+  const { charIndex, colorIndex, phase, ss, charY, centerX, canvasHeight } = p
+  const currentFace = getFaceForPhase(phase)
+  const body = CHAR_SPRITES.BODY
   const baseSize = SCENE_CONFIG.BASE_SIZE
+
+  const bodySheet = getColoredSheet(charIndex, colorIndex)
+  const faceSheet = getColoredSheet(charIndex, 0) // 臉部用原色
 
   const charRenderWidth = baseSize * ss.scaleX
   const charRenderHeight = baseSize * ss.scaleY
@@ -313,9 +269,6 @@ function drawCharacterCore(ctx: CanvasRenderingContext2D, p: DrawCharacterParams
 
   ctx.save()
   ctx.translate(centerX, charRenderBottom - charRenderHeight / 2)
-
-  drawHand(ctx, bodySheet, currentHand, -charRenderWidth / 2 - CHARACTER_ANIM_CONFIG.HAND_OFFSET_X, 0, handAngle.left, true)
-  drawHand(ctx, bodySheet, currentHand, charRenderWidth / 2 + CHARACTER_ANIM_CONFIG.HAND_OFFSET_X, 0, handAngle.right, false)
 
   ctx.drawImage(
     bodySheet,
@@ -338,14 +291,15 @@ function drawCharacterCore(ctx: CanvasRenderingContext2D, p: DrawCharacterParams
 // === 繪製靜止角色（共用核心）===
 function drawStaticCore(
   ctx: CanvasRenderingContext2D,
-  bodySheet: CanvasImageSource,
-  faceSheet: CanvasImageSource,
+  charIndex: number,
+  colorIndex: number,
   centerX: number,
   canvasHeight: number,
 ): void {
-  const body = SPRITES.BODY
-  const face = SPRITES.FACE_IDLE
-  const hand = SPRITES.HAND_CLOSED
+  const bodySheet = getColoredSheet(charIndex, colorIndex)
+  const faceSheet = getColoredSheet(charIndex, 0)
+  const body = CHAR_SPRITES.BODY
+  const face = CHAR_SPRITES.FACE_IDLE
   const baseSize = SCENE_CONFIG.BASE_SIZE
   const charRenderBottom =
     canvasHeight - SCENE_CONFIG.FLOOR_HEIGHT - SCENE_CONFIG.CHAR_FOOT_OFFSET
@@ -354,9 +308,6 @@ function drawStaticCore(
 
   ctx.save()
   ctx.translate(centerX, charRenderBottom - baseSize / 2)
-
-  drawHand(ctx, bodySheet, hand, -baseSize / 2 - CHARACTER_ANIM_CONFIG.HAND_OFFSET_X, 0, 0.3, true)
-  drawHand(ctx, bodySheet, hand, baseSize / 2 + CHARACTER_ANIM_CONFIG.HAND_OFFSET_X, 0, -0.3, false)
 
   ctx.drawImage(
     bodySheet,
@@ -379,38 +330,33 @@ function drawStaticCore(
 // === 單人/多人繪製（薄包裝）===
 export function drawCharacter(
   ctx: CanvasRenderingContext2D,
-  spritesheet: HTMLImageElement,
   canvasWidth: number,
   canvasHeight: number,
 ): void {
   const { jumpPhase, squashStretch, characterY } = singlePlayerState
-  drawCharacterCore(ctx, { bodySheet: spritesheet, faceSheet: spritesheet, phase: jumpPhase, ss: squashStretch, charY: characterY, centerX: canvasWidth / 2, canvasHeight })
+  drawCharacterCore(ctx, { charIndex: 0, colorIndex: 0, phase: jumpPhase, ss: squashStretch, charY: characterY, centerX: canvasWidth / 2, canvasHeight })
 }
 
 export function drawPlayerCharacter(
   ctx: CanvasRenderingContext2D,
-  spritesheet: HTMLImageElement,
   player: Player,
   playerX: number,
   canvasHeight: number,
 ): void {
   const state = player.jumpState
-  const coloredSheet = getColoredSpritesheet(player.colorIndex)
-  drawCharacterCore(ctx, { bodySheet: coloredSheet, faceSheet: spritesheet, phase: state.jumpPhase, ss: state.squashStretch, charY: state.characterY, centerX: playerX, canvasHeight })
+  drawCharacterCore(ctx, { charIndex: player.characterIndex, colorIndex: player.colorIndex, phase: state.jumpPhase, ss: state.squashStretch, charY: state.characterY, centerX: playerX, canvasHeight })
 }
 
 export function drawStaticCharacter(
   ctx: CanvasRenderingContext2D,
-  spritesheet: HTMLImageElement,
   canvasWidth: number,
   canvasHeight: number,
 ): void {
-  drawStaticCore(ctx, spritesheet, spritesheet, canvasWidth / 2, canvasHeight)
+  drawStaticCore(ctx, 0, 0, canvasWidth / 2, canvasHeight)
 }
 
 export function drawPlayersStatic(
   ctx: CanvasRenderingContext2D,
-  spritesheet: HTMLImageElement,
   players: Player[],
   canvasWidth: number,
   canvasHeight: number,
@@ -423,29 +369,28 @@ export function drawPlayersStatic(
   for (let index = 0; index < players.length; index++) {
     const player = players[index]!
     const playerX = spacing * (index + 1)
-    const coloredSheet = getColoredSpritesheet(player.colorIndex)
-    drawStaticCore(ctx, coloredSheet, spritesheet, playerX, canvasHeight)
+    drawStaticCore(ctx, player.characterIndex, player.colorIndex, playerX, canvasHeight)
   }
 }
 
 // === 繪製玩家預覽（等候室）===
 export function drawPlayerPreview(
   ctx: CanvasRenderingContext2D,
-  spritesheet: HTMLImageElement,
   player: Player,
   x: number,
   y: number,
 ): void {
-  const coloredSheet = getColoredSpritesheet(player.colorIndex)
-  const body = SPRITES.BODY
-  const face = SPRITES.FACE_IDLE
+  const bodySheet = getColoredSheet(player.characterIndex, player.colorIndex)
+  const faceSheet = getColoredSheet(player.characterIndex, 0)
+  const body = CHAR_SPRITES.BODY
+  const face = CHAR_SPRITES.FACE_IDLE
   const previewSize = MULTIPLAYER_CONFIG.PLAYER_PREVIEW_SIZE
 
   ctx.save()
   ctx.translate(x, y)
 
   ctx.drawImage(
-    coloredSheet,
+    bodySheet,
     body.x, body.y, body.w, body.h,
     -previewSize / 2, -previewSize / 2, previewSize, previewSize,
   )
@@ -454,7 +399,7 @@ export function drawPlayerPreview(
   const faceHeight = previewSize * 0.35
   const faceWidth = faceHeight * faceSizeRatio
   ctx.drawImage(
-    spritesheet,
+    faceSheet,
     face.x, face.y, face.w, face.h,
     -faceWidth / 2, -previewSize / 2 + previewSize * 0.15, faceWidth, faceHeight,
   )

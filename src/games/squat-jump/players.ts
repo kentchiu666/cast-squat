@@ -4,6 +4,7 @@ import { JUMP_PHASE, MULTIPLAYER_CONFIG } from './constants'
 // === 玩家列表 ===
 let players: Player[] = []
 let isLocked = false
+let characterCount = 1
 
 // === 建立初始跳躍狀態 ===
 function createInitialJumpState() {
@@ -16,16 +17,24 @@ function createInitialJumpState() {
   }
 }
 
+// === 設定角色數量 ===
+export function setCharacterCount(count: number): void {
+  characterCount = Math.max(1, count)
+}
+
 // === 新增玩家 ===
 export function addPlayer(playerId: string, playerName: string): boolean {
   if (isLocked) return false
   if (players.length >= MULTIPLAYER_CONFIG.MAX_PLAYERS) return false
   if (players.find((p) => p.id === playerId)) return false
 
-  const colorIndex = players.length
+  const slot = players.length
+  const characterIndex = slot % characterCount
+  const colorIndex = Math.floor(slot / characterCount)
   players.push({
     id: playerId,
     name: playerName || `Player ${players.length + 1}`,
+    characterIndex,
     colorIndex,
     squatCount: 0,
     coinScore: 0,
@@ -65,6 +74,7 @@ export function getPlayerById(playerId: string): Player | undefined {
 export function resetPlayers(): void {
   players = []
   isLocked = false
+  characterCount = 1
 }
 
 export function resetPlayersGameState(): void {

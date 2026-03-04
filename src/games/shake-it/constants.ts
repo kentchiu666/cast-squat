@@ -1,4 +1,4 @@
-import type { PlayerColor } from '../../types/game'
+import type { PlayerColor, SpriteRect } from '../../types/game'
 
 // === 遊戲常數 ===
 export const GAME_DURATION = 20
@@ -14,33 +14,30 @@ export const SHAKE_ANIM = {
   OFFSET_Y_FREQUENCY: 0.6,
   SQUASH_AMPLITUDE: 0.08,
   SQUASH_FREQUENCY: 0.6,
-  HAND_SWING_AMPLITUDE: 0.5,
-  HAND_SWING_FREQUENCY: 0.3,
   PLAYER_PHASE_OFFSET: 15,
 } as const
 
-// === 精靈定義 ===
-export interface SpriteRect {
-  x: number
-  y: number
-  w: number
-  h: number
-}
-
-export const SPRITES = {
-  BODY: { x: 256, y: 0, w: 80, h: 80 },
-  FACE_IDLE: { x: 109, y: 547, w: 50, h: 29 },
-  FACE_SHAKING: { x: 400, y: 390, w: 55, h: 32 },
-  HAND_OPEN: { x: 508, y: 287, w: 34, h: 38 },
-  HAND_ROCK: { x: 466, y: 37, w: 36, h: 38 },
-  SHADOW: { x: 96, y: 122, w: 48, h: 20 },
+// === 標準角色精靈圖座標（1456×720 插畫風 PNG） ===
+export const CHAR_SPRITES = {
+  BODY:           { x: 30,   y: 10,  w: 310, h: 360 },
+  HAND_CLOSED:    { x: 390,  y: 80,  w: 160, h: 190 },
+  HAND_OPEN:      { x: 600,  y: 80,  w: 170, h: 190 },
+  HAND_PEACE:     { x: 810,  y: 80,  w: 170, h: 190 },
+  HAND_ROCK:      { x: 1020, y: 80,  w: 170, h: 190 },
+  SHADOW:         { x: 1220, y: 140, w: 200, h: 90 },
+  FACE_IDLE:      { x: 15,   y: 470, w: 220, h: 190 },
+  FACE_CALM:      { x: 250,  y: 470, w: 220, h: 190 },
+  FACE_SURPRISED: { x: 500,  y: 470, w: 220, h: 190 },
+  FACE_FOCUSED:   { x: 740,  y: 470, w: 220, h: 190 },
+  FACE_NERVOUS:   { x: 980,  y: 470, w: 220, h: 190 },
+  FACE_PAIN:      { x: 1220, y: 470, w: 220, h: 190 },
 } as const satisfies Record<string, SpriteRect>
 
 // === 場景配置 ===
 export const SCENE_CONFIG = {
   FLOOR_HEIGHT: 100,
   CHAR_FOOT_OFFSET: 20,
-  BASE_SIZE: 80,
+  BASE_SIZE: 140,
 } as const
 
 // === 8 人玩家顏色 ===
@@ -70,10 +67,8 @@ export const EFFECTS_CONFIG = {
 
 // === 角色繪製配置 ===
 export const CHARACTER_ANIM_CONFIG = {
-  FACE_HEIGHT: 28,
-  FACE_Y_OFFSET: 12,
-  HAND_OFFSET_X: 15,
-  HAND_SCALE: 0.8,
+  FACE_HEIGHT: 50,
+  FACE_Y_OFFSET: 20,
 } as const
 
 // === 派對背景配置 ===

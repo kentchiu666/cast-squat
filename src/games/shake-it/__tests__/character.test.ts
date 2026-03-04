@@ -9,8 +9,6 @@ describe('getShakeTransform', () => {
     expect(transform).toHaveProperty('rotation')
     expect(transform).toHaveProperty('scaleX')
     expect(transform).toHaveProperty('scaleY')
-    expect(transform).toHaveProperty('handAngleLeft')
-    expect(transform).toHaveProperty('handAngleRight')
   })
 
   it('timer=0 時 offsetX 應為 0（sin(0)=0）', () => {
@@ -29,11 +27,6 @@ describe('getShakeTransform', () => {
     // scaleX = 1 + sin * amp, scaleY = 1 - sin * amp
     // 所以 scaleX + scaleY 應接近 2
     expect(transform.scaleX + transform.scaleY).toBeCloseTo(2)
-  })
-
-  it('handAngleLeft 和 handAngleRight 應互為反向', () => {
-    const transform = getShakeTransform(30, 0)
-    expect(transform.handAngleLeft).toBeCloseTo(-transform.handAngleRight)
   })
 
   it('offsetY 應始終 >= 0（用 abs）', () => {

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sprite Debug</title>
+<style>
+body { background: #222; color: #fff; font-family: monospace; margin: 20px; }
+canvas { border: 1px solid #666; display: block; margin: 20px 0; max-width: 100%; }
+.info { font-size: 14px; margin: 5px 0; }
+button { padding: 8px 16px; margin: 5px; font-size: 14px; cursor: pointer; }
+.section { margin: 20px 0; padding: 15px; border: 1px solid #555; }
+h3 { margin-top: 0; }
+#status { color: #0f0; margin: 10px 0; }
+</style>
+</head>
+<body>
+<h2>Sprite Debug Tool</h2>
+
+<!-- 角色選擇 -->
+<div class="section">
+  <h3>選擇角色</h3>
+  <button onclick="loadImage('characters/bear.png')" style="background:#FFD700">Bear</button>
+  <button onclick="loadImage('characters/sheep.png')" style="background:#B388FF">Sheep</button>
+  <span id="currentFile" style="margin-left:10px; color:#aaa;">characters/bear.png</span>
+</div>
+
+<!-- 去背工具 -->
+<div class="section">
+  <h3>Step 1: 去背（移除格子花紋背景）</h3>
+  <p>點擊圖片上的背景區域來取樣背景顏色，然後按「Remove Background」</p>
+  <button onclick="analyzeAndRemoveBg()">Auto Remove Background (偵測格子花紋)</button>
+  <button onclick="downloadClean()">Download Clean PNG</button>
+  <div id="status"></div>
+</div>
+
+<div id="coords">x: 0, y: 0 | rgba: 0,0,0,0</div>
+<canvas id="c"></canvas>
+
+<!-- 座標工具 -->
+<div class="section">
+  <h3>Step 2: 調整座標</h3>
+  <textarea id="spriteJson" rows="20" cols="80" style="font-family:monospace; font-size:13px;"></textarea>
+  <br><button onclick="applyAndRedraw()">Apply & Redraw</button>
+</div>
+
+<script>
+const CHAR_SPRITES = {
+  BODY:           { x: 30,   y: 10,  w: 310, h: 360 },
+  HAND_CLOSED:    { x: 390,  y: 80,  w: 160, h: 190 },
+  HAND_OPEN:      { x: 600,  y: 80,  w: 170, h: 190 },
+  HAND_PEACE:     { x: 810,  y: 80,  w: 170, h: 190 },
+  HAND_ROCK:      { x: 1020, y: 80,  w: 170, h: 190 },
+  SHADOW:         { x: 1220, y: 140, w: 200, h: 90 },
+  FACE_IDLE:      { x: 15,   y: 470, w: 220, h: 190 },
+  FACE_CALM:      { x: 250,  y: 470, w: 220, h: 190 },
+  FACE_SURPRISED: { x: 500,  y: 470, w: 220, h: 190 },
+  FACE_FOCUSED:   { x: 740,  y: 470, w: 220, h: 190 },
+  FACE_NERVOUS:   { x: 980,  y: 470, w: 220, h: 190 },
+  FACE_PAIN:      { x: 1220, y: 470, w: 220, h: 190 },
+};
+
+let currentSprites = JSON.parse(JSON.stringify(CHAR_SPRITES));
+let img = null;
+let cleanImageData = null; // 去背後的 ImageData
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+document.getElementById('spriteJson').value = JSON.stringify(currentSprites, null, 2);
+
+function loadImage(src) {
+  img = new Image();
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    draw();
+    checkAlpha();
+    document.getElementById('currentFile').textContent = src + ' (' + img.width + '×' + img.height + ')';
+  };
+  img.src = src;
+}
+
+// 預設載入 bear
+loadImage('characters/bear.png');
+
+function checkAlpha() {
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = img.width;
+  tempCanvas.height = img.height;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.drawImage(img, 0, 0);
+  const data = tempCtx.getImageData(0, 0, img.width, img.height);
+
+  let transparentCount = 0;
+  for (let i = 3; i < data.data.length; i += 4) {
+    if (data.data[i] < 10) transparentCount++;
+  }
+  const total = img.width * img.height;
+  const pct = (transparentCount / total * 100).toFixed(1);
+
+  const status = document.getElementById('status');
+  if (transparentCount / total > 0.3) {
+    status.textContent = `✓ 圖片已有透明背景（${pct}% 透明像素）`;
+    status.style.color = '#0f0';
+  } else {
+    status.textContent = `✗ 背景不透明（只有 ${pct}% 透明像素）— 需要去背`;
+    status.style.color = '#f66';
+  }
+}
+
+function analyzeAndRemoveBg() {
+  const status = document.getElementById('status');
+  status.textContent = '處理中...';
+
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = img.width;
+  tempCanvas.height = img.height;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.drawImage(img, 0, 0);
+  const imageData = tempCtx.getImageData(0, 0, img.width, img.height);
+  const data = imageData.data;
+
+  // 取樣四個角落的顏色作為背景色參考
+  const corners = [
+    [0, 0], [img.width-1, 0], [0, img.height-1], [img.width-1, img.height-1],
+    [img.width/2, 0], [img.width-1, img.height/2],
+  ];
+
+  const bgColors = new Set();
+  for (const [x, y] of corners) {
+    const i = (Math.floor(y) * img.width + Math.floor(x)) * 4;
+    const r = data[i], g = data[i+1], b = data[i+2];
+    bgColors.add(`${r},${g},${b}`);
+  }
+
+  console.log('Detected bg colors:', [...bgColors]);
+
+  // 格子花紋通常是兩種灰色交替（如 #C0C0C0 和 #FFFFFF，或 #CCCCCC 和 #EEEEEE）
+  // 也可能是淺灰色系
+  let removed = 0;
+  const tolerance = 30; // 顏色容差
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+
+    if (a === 0) continue; // 已經透明
+
+    const key = `${r},${g},${b}`;
+    let isBg = false;
+
+    // 檢查是否匹配角落取樣的背景色
+    for (const bgKey of bgColors) {
+      const [br, bg, bb] = bgKey.split(',').map(Number);
+      if (Math.abs(r - br) < tolerance && Math.abs(g - bg) < tolerance && Math.abs(b - bb) < tolerance) {
+        isBg = true;
+        break;
+      }
+    }
+
+    // 額外檢查：常見的格子花紋顏色（灰白交替）
+    if (!isBg) {
+      const isGrayWhite = (
+        // 白色/近白色
+        (r > 230 && g > 230 && b > 230) ||
+        // 淺灰格子 (~192,192,192 或 ~204,204,204)
+        (Math.abs(r - g) < 5 && Math.abs(g - b) < 5 && r > 180 && r < 220)
+      );
+      if (isGrayWhite) isBg = true;
+    }
+
+    if (isBg) {
+      data[i+3] = 0; // 設為透明
+      removed++;
+    }
+  }
+
+  cleanImageData = imageData;
+  tempCtx.putImageData(imageData, 0, 0);
+
+  // 更新 img 為處理後的版本
+  const cleanUrl = tempCanvas.toDataURL('image/png');
+  const newImg = new Image();
+  newImg.onload = () => {
+    img = newImg;
+    draw();
+    status.textContent = `✓ 去背完成！移除了 ${removed} 個背景像素（${(removed/(img.width*img.height)*100).toFixed(1)}%）`;
+    status.style.color = '#0f0';
+  };
+  newImg.src = cleanUrl;
+}
+
+function downloadClean() {
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = img.width;
+  tempCanvas.height = img.height;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.drawImage(img, 0, 0);
+
+  const link = document.createElement('a');
+  link.download = 'bear-clean.png';
+  link.href = tempCanvas.toDataURL('image/png');
+  link.click();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw checkerboard background (to show transparency)
+  const size = 20;
+  for (let y = 0; y < canvas.height; y += size) {
+    for (let x = 0; x < canvas.width; x += size) {
+      ctx.fillStyle = ((x + y) / size) % 2 === 0 ? '#333' : '#444';
+      ctx.fillRect(x, y, size, size);
+    }
+  }
+
+  // Draw image
+  ctx.drawImage(img, 0, 0);
+
+  // Draw sprite rectangles
+  const colors = ['#ff0000', '#ff4444', '#ff6666', '#ff8888', '#ffaaaa', '#ffcccc',
+                  '#00ff00', '#44ff44', '#66ff66', '#88ff88', '#aaffaa', '#ccffcc'];
+  let i = 0;
+  for (const [name, rect] of Object.entries(currentSprites)) {
+    ctx.strokeStyle = colors[i % colors.length];
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+
+    ctx.fillStyle = '#00ff00';
+    ctx.font = '14px monospace';
+    ctx.fillText(`${name}`, rect.x + 2, rect.y - 4);
+    ctx.fillStyle = '#ffff00';
+    ctx.font = '11px monospace';
+    ctx.fillText(`(${rect.x},${rect.y} ${rect.w}×${rect.h})`, rect.x + 2, rect.y + rect.h + 14);
+    i++;
+  }
+}
+
+// Mouse coordinate tracking with pixel color
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = Math.floor((e.clientX - rect.left) * scaleX);
+  const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+  // Get pixel color from original image
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = img.width;
+  tempCanvas.height = img.height;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.drawImage(img, 0, 0);
+  const pixel = tempCtx.getImageData(x, y, 1, 1).data;
+
+  document.getElementById('coords').textContent =
+    `x: ${x}, y: ${y} | rgba: ${pixel[0]},${pixel[1]},${pixel[2]},${pixel[3]}`;
+});
+
+function applyAndRedraw() {
+  try {
+    currentSprites = JSON.parse(document.getElementById('spriteJson').value);
+    draw();
+  } catch(e) {
+    alert('JSON parse error: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>

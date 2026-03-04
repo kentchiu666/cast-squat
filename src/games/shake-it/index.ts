@@ -2,6 +2,7 @@ import type { GameModule, GameState, CastMessageData, BroadcastFn, ReplyFn } fro
 import { GAME_DURATION, RESULT_TIMEOUT, SCENE_CONFIG, EFFECTS_CONFIG, PARTY_BG } from './constants'
 import {
   initColoredSpritesheets,
+  destroyCharacterSprites,
   drawShakingCharacter,
   drawShakingCharacters,
   drawStaticCharacter,
@@ -22,6 +23,7 @@ import {
   submitPlayerResult,
   allPlayersSubmitted,
   getLeaderboard,
+  setCharacterCount,
 } from './players'
 import {
   createGameDOM,
@@ -45,7 +47,6 @@ let shakeCount = 0
 let timer = GAME_DURATION
 let countdownInterval: ReturnType<typeof setInterval> | null = null
 let finalScore = 0
-let _spritesheet: HTMLImageElement | null = null
 let _broadcastFn: BroadcastFn | null = null
 let _replyFn: ReplyFn | null = null
 let _returnToLobbyFn: (() => void) | null = null
@@ -410,12 +411,12 @@ const ShakeItGame: GameModule = {
   id: 'shake_it',
   name: 'Shake It!',
 
-  init(_canvas, _ctx, spritesheet, domContainer) {
-    _spritesheet = spritesheet
+  init(_canvas, _ctx, characterSheets, _itemSpritesheet, domContainer) {
     logicalWidth = globalThis.innerWidth
     logicalHeight = globalThis.innerHeight
 
-    initColoredSpritesheets(spritesheet)
+    initColoredSpritesheets(characterSheets)
+    setCharacterCount(characterSheets.filter(Boolean).length)
     createGameDOM(domContainer, handleAction)
     initPartyLights()
 
@@ -444,6 +445,8 @@ const ShakeItGame: GameModule = {
     destroyGameDOM()
     globalThis.removeEventListener('resize', handleResize)
 
+    destroyCharacterSprites()
+
     gameState = 'START_SCREEN'
     shakeCount = 0
     timer = GAME_DURATION
@@ -451,7 +454,6 @@ const ShakeItGame: GameModule = {
     globalShakeTimer = 0
     partyLights = []
     bgGradient = null
-    _spritesheet = null
     _broadcastFn = null
     _replyFn = null
     _returnToLobbyFn = null
@@ -492,14 +494,12 @@ const ShakeItGame: GameModule = {
         break
       case 'COUNTDOWN':
         drawFloor(ctx)
-        if (_spritesheet) {
-          if (isMultiplayerMode()) {
-            const players = getPlayers()
-            const positions = getPlayerPositions(logicalWidth)
-            drawPlayersStatic(ctx, _spritesheet, positions, players.map(p => p.colorIndex), logicalHeight)
-          } else {
-            drawStaticCharacter(ctx, _spritesheet, logicalWidth, logicalHeight)
-          }
+        if (isMultiplayerMode()) {
+          const players = getPlayers()
+          const positions = getPlayerPositions(logicalWidth)
+          drawPlayersStatic(ctx, positions, players.map(p => p.characterIndex), players.map(p => p.colorIndex), logicalHeight)
+        } else {
+          drawStaticCharacter(ctx, logicalWidth, logicalHeight)
         }
         break
       case 'PLAYING': {
@@ -508,14 +508,12 @@ const ShakeItGame: GameModule = {
         ctx.save()
         ctx.translate(screenShake.x, screenShake.y)
         drawFloor(ctx)
-        if (_spritesheet) {
-          if (isMultiplayerMode()) {
-            const players = getPlayers()
-            const positions = getPlayerPositions(logicalWidth)
-            drawShakingCharacters(ctx, _spritesheet, positions, players.map(p => p.colorIndex), logicalHeight, globalShakeTimer)
-          } else {
-            drawShakingCharacter(ctx, _spritesheet, logicalWidth, logicalHeight, globalShakeTimer)
-          }
+        if (isMultiplayerMode()) {
+          const players = getPlayers()
+          const positions = getPlayerPositions(logicalWidth)
+          drawShakingCharacters(ctx, positions, players.map(p => p.characterIndex), players.map(p => p.colorIndex), logicalHeight, globalShakeTimer)
+        } else {
+          drawShakingCharacter(ctx, logicalWidth, logicalHeight, globalShakeTimer)
         }
         ctx.restore()
         break
