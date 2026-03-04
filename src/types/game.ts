@@ -38,7 +38,7 @@ export type GameType = 'COUNT' | 'REACT' | 'ENDURE' | 'HIIT' | 'PEAK'
 export type PlatformState = 'LOBBY' | 'GAME_ACTIVE'
 
 // === 遊戲內部狀態 ===
-export type GameState = 'START_SCREEN' | 'COUNTDOWN' | 'PLAYING' | 'GAME_OVER'
+export type GameState = 'START_SCREEN' | 'COUNTDOWN' | 'PLAYING' | 'RESULT_PENDING' | 'GAME_OVER'
 
 // === Cast 訊息型別 ===
 export type CastMessageData =
@@ -49,6 +49,8 @@ export type CastMessageData =
   | { action: 'PLAYER_LEAVE'; playerId: string }
   | { action: 'START_GAME' }
   | { action: 'SQUAT_JUMP'; playerId?: string }
+  | { action: 'SHAKE'; playerId?: string }
+  | { action: 'GAME_RESULT'; playerId: string; score: number; details?: { shakes: number } }
   | string  // 舊版相容
 
 // === 通訊函數型別 ===
@@ -80,6 +82,15 @@ export interface JumpState {
 export interface SquashStretch {
   scaleX: number
   scaleY: number
+}
+
+// === Shake It 玩家 ===
+export interface ShakePlayer {
+  id: string
+  name: string
+  colorIndex: number
+  score: number
+  hasSubmitted: boolean
 }
 
 // === 玩家顏色 ===

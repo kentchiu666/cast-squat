@@ -22,8 +22,8 @@ export const GAMES: GameInfo[] = [
     iconColor: '#4ECDC4',
     type: 'COUNT',
     typeLabel: 'Count',
-    available: false,
-    module: null,
+    available: true,
+    module: () => import('./games/shake-it/index'),
   },
   {
     id: 'pan_flip',
