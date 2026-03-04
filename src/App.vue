@@ -14,6 +14,12 @@
 
     <!-- FPS 計數器 -->
     <div id="fps">{{ fps }} FPS</div>
+
+    <!-- Cast 除錯面板 -->
+    <div id="cast-debug">
+      <div>P:{{ platformState }} G:{{ activeGameId ?? 'none' }}</div>
+      <div v-for="(msg, i) in debugMessages" :key="i">{{ msg }}</div>
+    </div>
   </div>
 </template>
 
@@ -26,6 +32,19 @@ import { getGameById, GAMES } from './game-registry'
 // === 平台狀態 ===
 const platformState = ref<PlatformState>('LOBBY')
 const fps = ref(0)
+
+// === 除錯面板 ===
+const debugMessages = ref<string[]>([])
+const activeGameId = ref<string | null>(null)
+const MAX_DEBUG_MESSAGES = 8
+
+function addDebug(msg: string): void {
+  const ts = new Date().toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  debugMessages.value.unshift(`[${ts}] ${msg}`)
+  if (debugMessages.value.length > MAX_DEBUG_MESSAGES) {
+    debugMessages.value.length = MAX_DEBUG_MESSAGES
+  }
+}
 
 // === Canvas 參考 ===
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -164,6 +183,7 @@ function handleCastMessage(event: { data: unknown; senderId: string }): void {
   const senderId = event.senderId
 
   console.log('[Cast] 收到訊息:', JSON.stringify(data), 'from:', senderId)
+  addDebug(`IN: ${typeof data === 'string' ? data.substring(0, 40) : JSON.stringify(data).substring(0, 40)}`)
 
   // Cast SDK 可能傳入 JSON 字串，先嘗試解析
   if (typeof data === 'string') {
@@ -223,6 +243,7 @@ function handleCastMessage(event: { data: unknown; senderId: string }): void {
 
 function initCastReceiver(): void {
   if (typeof cast === 'undefined' || !cast.framework) {
+    addDebug('Cast SDK 不存在，本地模式')
     console.log('[Cast] SDK 不存在，使用本地測試模式')
     return
   }
@@ -231,8 +252,10 @@ function initCastReceiver(): void {
     castContext = cast.framework.CastReceiverContext.getInstance()
     castContext.addCustomMessageListener(CAST_NAMESPACE, handleCastMessage)
     castContext.start()
+    addDebug('Cast Receiver 已啟動')
     console.log('[Cast] Receiver 已啟動')
   } catch (e) {
+    addDebug(`Cast 初始化失敗: ${e}`)
     console.warn('[Cast] 初始化失敗:', e)
     castContext = null
   }
@@ -358,27 +381,39 @@ function updateFPS() {
 // === 遊戲選擇 ===
 async function handleGameSelect(gameId: string) {
   const gameInfo = getGameById(gameId)
-  if (!gameInfo?.module || !canvasRef.value || !ctx || !textLayerRef.value) return
-  if (characterSheets.value.filter(Boolean).length === 0) return
+  addDebug(`SELECT: ${gameId} found=${!!gameInfo?.module}`)
+  if (!gameInfo?.module || !canvasRef.value || !ctx || !textLayerRef.value) {
+    addDebug(`ABORT: canvas=${!!canvasRef.value} ctx=${!!ctx} text=${!!textLayerRef.value}`)
+    return
+  }
+  if (characterSheets.value.filter(Boolean).length === 0) {
+    addDebug('ABORT: no character sheets')
+    return
+  }
 
   const mod = await gameInfo.module()
   activeGame = mod.default
+  activeGameId.value = gameId
 
+  addDebug(`INIT: ${activeGame.id} sheets=${characterSheets.value.filter(Boolean).length}`)
   activeGame.init(canvasRef.value, ctx, characterSheets.value, itemSpritesheet, textLayerRef.value)
   activeGame.setBroadcastCallbacks(castBroadcast, castReply)
   activeGame.setReturnToLobbyCallback?.(() => handleReturnToLobby())
   activeGame.start()
   platformState.value = 'GAME_ACTIVE'
+  addDebug(`STARTED: ${gameId}`)
   broadcastPlatformState()
 }
 
 // === 返回 LOBBY ===
 function handleReturnToLobby() {
+  addDebug(`RETURN_LOBBY from=${activeGameId.value}`)
   if (activeGame) {
     activeGame.stop()
     activeGame.destroy()
     activeGame = null
   }
+  activeGameId.value = null
   platformState.value = 'LOBBY'
   broadcastPlatformState()
   nextTick(() => broadcastLobbyState())
@@ -450,6 +485,7 @@ onMounted(() => {
     }),
   }
 
+  addDebug('平台已初始化 - LOBBY')
   console.log('平台已初始化 - LOBBY 模式')
 })
 
@@ -504,5 +540,20 @@ body {
   font-size: 12px;
   font-family: monospace;
   z-index: 100;
+}
+
+#cast-debug {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  color: #0f0;
+  font-size: 10px;
+  font-family: monospace;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px 8px;
+  z-index: 200;
+  max-width: 50%;
+  word-break: break-all;
+  line-height: 1.4;
 }
 </style>
