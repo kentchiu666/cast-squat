@@ -36,7 +36,7 @@ const fps = ref(0)
 // === 除錯面板 ===
 const debugMessages = ref<string[]>([])
 const activeGameId = ref<string | null>(null)
-const MAX_DEBUG_MESSAGES = 8
+const MAX_DEBUG_MESSAGES = 15
 
 function addDebug(msg: string): void {
   const ts = new Date().toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -375,7 +375,7 @@ function gameLoop(timestamp: number) {
 
   // 每 120 幀記錄一次狀態
   debugFrameCount++
-  if (debugFrameCount % 120 === 0) {
+  if (debugFrameCount % 300 === 0) {
     const gs = activeGame?.getState() ?? 'N/A'
     addDebug(`F${debugFrameCount} gs=${gs} fps=${fps.value} ${logicalWidth}x${logicalHeight}`)
   }
@@ -469,6 +469,7 @@ onMounted(() => {
       const img = new Image()
       img.src = config.path
       img.onload = async () => {
+        addDebug(`IMG OK: ${config.path} ${img.width}x${img.height}`)
         if (config.sourceSprites) {
           sheets[index] = await normalizeSheet(img, config.sourceSprites)
         } else {
@@ -477,6 +478,7 @@ onMounted(() => {
         resolve()
       }
       img.onerror = () => {
+        addDebug(`IMG FAIL: ${config.path}`)
         console.warn(`角色精靈圖載入失敗: ${config.path}`)
         resolve()
       }
@@ -485,6 +487,8 @@ onMounted(() => {
 
   // 載入物品精靈圖（金幣等）
   itemSpritesheet = new Image()
+  itemSpritesheet.onload = () => addDebug(`ITEM OK: ${itemSpritesheet!.width}x${itemSpritesheet!.height}`)
+  itemSpritesheet.onerror = () => addDebug('ITEM FAIL')
   itemSpritesheet.src = 'kenney_shape-characters/Spritesheet/spritesheet_default.png'
 
   Promise.all(charLoadPromises).then(() => {
