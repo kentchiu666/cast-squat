@@ -256,7 +256,7 @@ function tickPlaying(): void {
 
 // === 繪製畫面 ===
 function syncPlayersToUI(): void {
-  uiState.players = getPlayers()
+  uiState.players = [...getPlayers()]
 }
 
 function drawCountdownScreen(ctx: CanvasRenderingContext2D): void {
@@ -273,7 +273,7 @@ function renderPlayingScreen(ctx: CanvasRenderingContext2D): void {
   uiState.squatCount = squatCount
   uiState.coinScore = getCoinScore()
   uiState.timer = timer
-  uiState.players = getPlayers()
+  uiState.players = [...getPlayers()]
 
   const screenShake = getScreenShake()
   ctx.save()
