@@ -262,7 +262,7 @@ function initCastReceiver(): void {
 }
 
 // === Canvas 尺寸 ===
-const CANVAS_SCALE = 1
+const CANVAS_SCALE = 0.5
 let logicalWidth = 0
 let logicalHeight = 0
 
@@ -300,7 +300,7 @@ function resizeCanvas() {
   canvas.style.height = logicalHeight + 'px'
 
   if (ctx) {
-    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingEnabled = false
     ctx.setTransform(CANVAS_SCALE, 0, 0, CANVAS_SCALE, 0, 0)
   }
 }
@@ -351,7 +351,9 @@ function gameLoop(timestamp: number) {
   lastFrameTime = timestamp
 
   tickAccumulator += dt
-  while (tickAccumulator >= TICK_MS) {
+  let tickCount = 0
+  const MAX_TICKS_PER_FRAME = 3
+  while (tickAccumulator >= TICK_MS && tickCount < MAX_TICKS_PER_FRAME) {
     try {
       tick()
     } catch (e) {
@@ -361,7 +363,9 @@ function gameLoop(timestamp: number) {
       }
     }
     tickAccumulator -= TICK_MS
+    tickCount++
   }
+  if (tickAccumulator > TICK_MS) tickAccumulator = 0
 
   try {
     render()
@@ -459,7 +463,7 @@ onMounted(() => {
 
   ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingEnabled = false
   }
 
   // 載入角色精靈圖（並行載入 → 正規化座標）
