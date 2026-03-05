@@ -39,18 +39,8 @@ import {
   getLeaderboard,
   setCharacterCount,
 } from './players'
-import {
-  createGameDOM,
-  destroyGameDOM,
-  showStartScreen,
-  showCountdown,
-  showPlaying,
-  showGameOver,
-  triggerCountdownPop,
-  updatePlayingScores,
-  updatePlayerList,
-  updateGameOverContent,
-} from './dom-ui'
+import { uiState, resetUIState } from './ui-state'
+import SquatJumpUI from './SquatJumpUI.vue'
 
 // === 模組級狀態 ===
 let gameState: GameState = 'START_SCREEN'
@@ -92,19 +82,26 @@ function changeState(newState: GameState): void {
     _broadcastFn({ type: 'STATE_UPDATE', state: newState })
   }
 
+  uiState.gameState = newState
+
   switch (newState) {
     case 'START_SCREEN':
-      showStartScreen()
+      uiState.actionButtonText = 'START GAME'
       break
     case 'COUNTDOWN':
-      showCountdown()
+      uiState.actionButtonText = 'GET READY!'
+      uiState.countdownText = ''
       break
     case 'PLAYING':
-      showPlaying(isMultiplayerMode(), getPlayers())
+      uiState.actionButtonText = 'JUMP!'
+      uiState.isMultiplayer = isMultiplayerMode()
+      uiState.countdownText = ''
       break
     case 'GAME_OVER':
-      showGameOver()
-      updateGameOverContent(isMultiplayerMode(), getLeaderboard(), finalScore, getCoinScore())
+      uiState.actionButtonText = 'RESTART'
+      uiState.leaderboard = getLeaderboard()
+      uiState.finalScore = finalScore
+      uiState.coinScore = getCoinScore()
       break
   }
 }
@@ -162,7 +159,10 @@ function startDOMCountdown(): void {
   for (let i = 0; i < numbers.length; i++) {
     const item = numbers[i]!
     const tid = setTimeout(() => {
-      triggerCountdownPop(item.text, item.color, item.fontSize)
+      uiState.countdownText = item.text
+      uiState.countdownColor = item.color
+      uiState.countdownFontSize = item.fontSize
+      uiState.countdownKey++
     }, i * 1000)
     countdownTimeouts.push(tid)
   }
@@ -211,6 +211,7 @@ function handlePlayerJoin(playerId: string, playerName: string, senderId?: strin
 
   if (addPlayerToList(playerId, playerName)) {
     const player = getPlayerById(playerId)
+    syncPlayersToUI()
     replyTo(senderId, { type: 'JOIN_RESULT', success: true, colorIndex: player?.colorIndex ?? 0 })
     replyTo(senderId, { type: 'STATE_UPDATE', state: gameState })
   } else {
@@ -254,8 +255,8 @@ function tickPlaying(): void {
 }
 
 // === 繪製畫面 ===
-function drawStartScreen(): void {
-  updatePlayerList(getPlayers())
+function syncPlayersToUI(): void {
+  uiState.players = getPlayers()
 }
 
 function drawCountdownScreen(ctx: CanvasRenderingContext2D): void {
@@ -269,7 +270,10 @@ function drawCountdownScreen(ctx: CanvasRenderingContext2D): void {
 }
 
 function renderPlayingScreen(ctx: CanvasRenderingContext2D): void {
-  updatePlayingScores(isMultiplayerMode(), getPlayers(), squatCount, getCoinScore(), timer)
+  uiState.squatCount = squatCount
+  uiState.coinScore = getCoinScore()
+  uiState.timer = timer
+  uiState.players = getPlayers()
 
   const screenShake = getScreenShake()
   ctx.save()
@@ -311,7 +315,7 @@ function handleStructuredMessage(data: Exclude<CastMessageData, string>, senderI
     case 'PLAYER_LEAVE':
       if (gameState === 'START_SCREEN') {
         removePlayerFromList(data.playerId)
-        updatePlayerList(getPlayers())
+        syncPlayersToUI()
       }
       break
 
@@ -348,14 +352,14 @@ const SquatJumpGame: GameModule = {
   id: 'squat_jump',
   name: 'Squat Jump',
 
-  init(_canvas, _ctx, characterSheets, itemSpritesheet, domContainer) {
+  init(_canvas, _ctx, characterSheets, itemSpritesheet) {
     _itemSpritesheet = itemSpritesheet
     logicalWidth = globalThis.innerWidth
     logicalHeight = globalThis.innerHeight
 
     initCharacterSprites(characterSheets)
     setCharacterCount(characterSheets.filter(Boolean).length)
-    createGameDOM(domContainer, handleAction)
+    uiState.onAction = handleAction
 
     globalThis.addEventListener('resize', handleResize)
 
@@ -382,7 +386,7 @@ const SquatJumpGame: GameModule = {
     resetPlayerCoins()
     clearParticles()
     resetEffects()
-    destroyGameDOM()
+    resetUIState()
     globalThis.removeEventListener('resize', handleResize)
 
     destroyCharacterSprites()
@@ -413,6 +417,10 @@ const SquatJumpGame: GameModule = {
     return gameState
   },
 
+  getUIComponent() {
+    return SquatJumpUI
+  },
+
   setBroadcastCallbacks(broadcastFn, replyFn) {
     _broadcastFn = broadcastFn
     _replyFn = replyFn
@@ -431,7 +439,7 @@ const SquatJumpGame: GameModule = {
   render(ctx: CanvasRenderingContext2D) {
     switch (gameState) {
       case 'START_SCREEN':
-        drawStartScreen()
+        syncPlayersToUI()
         break
       case 'COUNTDOWN':
         drawCountdownScreen(ctx)

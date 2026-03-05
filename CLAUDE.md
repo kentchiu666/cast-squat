@@ -8,7 +8,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-這是一個 **Google Cast Party Game 平台**，採用 **Vue 3 + TypeScript + Vite** 架構。平台在 Chromecast 或智慧電視上執行，提供 LOBBY（遊戲大廳）讓使用者選擇遊戲，目前已實作「深蹲跳躍」(Squat Jump) 遊戲模組。
+這是一個 **Google Cast Party Game 平台**，採用 **Vue 3 + TypeScript + Vite** 架構。平台在 Chromecast 或智慧電視上執行，提供 LOBBY（遊戲大廳）讓使用者選擇遊戲，目前已實作「深蹲跳躍」(Squat Jump) 和「搖搖樂」(Shake It) 兩個遊戲模組。
 
 使用者透過手機 Sender App（Flutter）發送 Cast 訊息來控制遊戲。
 
@@ -16,6 +16,7 @@ This file provides guidance to Claude Code when working with this repository.
 - **LOBBY 遊戲大廳**：像素藝術風格，顯示可用遊戲清單，支援 Cast 或點擊選擇遊戲
 - **遊戲模組系統**：GameModule 介面統一管理，支援動態載入（code-splitting）
 - **深蹲跳躍遊戲**：20 秒計時 / 7 階段跳躍動畫 / 金幣收集 / 多人模式（最多 4 人）
+- **搖搖樂遊戲**：盲玩模式 / sin 曲線搖晃動畫 / RESULT_PENDING 結果收集 / 多人模式（最多 8 人）
 - **多人等候室**：START_SCREEN 顯示已加入玩家（角色預覽 + 名稱）
 - **排行榜**：遊戲結束顯示玩家排名
 - 支援本地瀏覽器測試與 Google Cast 部署
@@ -31,7 +32,7 @@ cast-squat/
 ├── tsconfig.json                       # TypeScript 設定
 ├── src/
 │   ├── main.ts                         # Vue 應用入口
-│   ├── App.vue                         # 主元件（Canvas + 星空 + 遊戲迴圈）
+│   ├── App.vue                         # 主元件（Canvas + 星空 + 遊戲迴圈 + 動態遊戲 UI）
 │   ├── game-registry.ts                # 遊戲註冊表（動態 import）
 │   ├── types/
 │   │   ├── game.ts                     # 所有型別定義（含 Cast 訊息、GameInfoSlim）
@@ -40,16 +41,25 @@ cast-squat/
 │   │   ├── LobbyScreen.vue             # LOBBY 大廳畫面
 │   │   └── GameCard.vue                # 遊戲卡片元件
 │   └── games/
-│       └── squat-jump/                 # 深蹲跳躍遊戲模組
-│           ├── index.ts                # GameModule 實作（狀態機 + 訊息處理）
-│           ├── constants.ts            # 遊戲常數、跳躍配置、精靈座標
-│           ├── utils.ts                # 緩動函數、數學工具、碰撞檢測
-│           ├── character.ts            # 角色跳躍狀態機、繪製、彩色精靈圖
-│           ├── coins.ts                # 金幣生成、碰撞、繪製
-│           ├── particles.ts            # 粒子系統
-│           ├── effects.ts              # 殘影、速度線、螢幕震動
-│           ├── players.ts              # 多人玩家管理
-│           └── dom-ui.ts              # DOM UI 建立/更新/銷毀
+│       ├── squat-jump/                 # 深蹲跳躍遊戲模組
+│       │   ├── index.ts                # GameModule 實作（狀態機 + 訊息處理）
+│       │   ├── ui-state.ts             # Vue reactive 狀態物件
+│       │   ├── SquatJumpUI.vue         # 遊戲 UI 元件（Vue 管理）
+│       │   ├── constants.ts            # 遊戲常數、跳躍配置、精靈座標
+│       │   ├── utils.ts                # 緩動函數、數學工具、碰撞檢測
+│       │   ├── character.ts            # 角色跳躍狀態機、繪製、彩色精靈圖
+│       │   ├── coins.ts                # 金幣生成、碰撞、繪製
+│       │   ├── particles.ts            # 粒子系統
+│       │   ├── effects.ts              # 殘影、速度線、螢幕震動
+│       │   └── players.ts              # 多人玩家管理
+│       └── shake-it/                   # 搖搖樂遊戲模組
+│           ├── index.ts                # GameModule 實作（盲玩 + 結果收集）
+│           ├── ui-state.ts             # Vue reactive 狀態物件
+│           ├── ShakeItUI.vue           # 遊戲 UI 元件（Vue 管理）
+│           ├── constants.ts            # 遊戲常數、派對背景配置
+│           ├── character.ts            # 搖晃角色繪製、彩色精靈圖
+│           ├── effects.ts              # 螢幕震動
+│           └── players.ts              # 多人玩家管理（8 人、結果提交）
 ├── kenney_shape-characters/            # Kenney 免費角色素材包
 │   └── Spritesheet/
 │       ├── spritesheet_default.png
@@ -63,7 +73,7 @@ cast-squat/
 - **TypeScript** - 全專案型別安全
 - **Vite** - 建置工具 + HMR 開發伺服器
 - **HTML5 Canvas** - 遊戲圖形渲染（精靈、粒子、背景）
-- **DOM + CSS Animation** - 所有文字 UI（分數、倒數、排行榜）
+- **Vue 元件** - 所有遊戲文字 UI（分數、倒數、排行榜）透過 reactive state + scoped CSS 管理
 - **Google Cast Web Receiver SDK** - Cast 整合
 - **Press Start 2P Font** - 像素藝術字體（Google Fonts）
 
@@ -113,18 +123,24 @@ IDLE → ANTICIPATION → RISE → HANG → FALL → LAND → RECOVER → IDLE
 
 #### GameModule 介面
 所有遊戲模組必須實作 `GameModule` 介面（定義於 `src/types/game.ts`）：
-- `init(canvas, ctx, spritesheet, domContainer)` — 初始化，接收 DOM 容器
+- `init(canvas, ctx, characterSheets, itemSpritesheet)` — 初始化（不接收 DOM 容器）
 - `start()` / `stop()` / `destroy()` — 生命週期
 - `tick()` / `render(ctx)` — 由 App.vue 的 Fixed Timestep 迴圈驅動
 - `handleMessage(data, senderId?)` — Cast 訊息處理
+- `getUIComponent()` — 回傳遊戲的 Vue UI 元件
 - `setBroadcastCallbacks(broadcastFn, replyFn)` — 設定通訊回調
 - `setReturnToLobbyCallback?(fn)` — 返回 LOBBY 回調
 
 #### 動態載入 (Code-Splitting)
-遊戲模組透過 `game-registry.ts` 的 `module: () => import(...)` 實現按需載入。Vite 自動將遊戲模組打包為獨立 chunk。
+遊戲模組透過 `game-registry.ts` 的 `module: () => import(...)` 實現按需載入。Vite 自動將遊戲模組打包為獨立 chunk（含 Vue 元件和 scoped CSS）。
 
-#### DOM 容器注入
-遊戲 UI 元素注入 App.vue 的 `#textLayer`（`pointer-events: none`）。遊戲內按鈕需設定 `pointer-events: auto`。遊戲模組的 CSS 使用 `squat-` 前綴避免衝突，透過動態 `<style>` 注入/移除。
+#### 遊戲 UI Vue 元件化
+每個遊戲模組包含三個 UI 相關檔案：
+- **`ui-state.ts`** — `reactive()` 狀態物件，遊戲邏輯只更新此物件
+- **`*UI.vue`** — Vue 元件，綁定 reactive state 自動渲染，CSS 使用 `<style scoped>`
+- **`index.ts`** — `getUIComponent()` 回傳 Vue 元件
+
+App.vue 透過 `<component :is="activeGameUI" />` 動態掛載遊戲 UI 元件。遊戲結束返回 LOBBY 時設定 `activeGameUI = null`，Vue 自動卸載。遊戲模組不直接操作 DOM。
 
 #### Fixed Timestep 遊戲迴圈（App.vue 擁有）
 ```
@@ -154,6 +170,8 @@ gameLoop(timestamp)
 | 模組 | 職責 |
 |------|------|
 | `index.ts` | GameModule 實作、狀態機、Cast 訊息處理 |
+| `ui-state.ts` | Vue reactive 狀態物件（遊戲邏輯更新此物件） |
+| `SquatJumpUI.vue` | 遊戲 UI 元件（等候室、倒數、分數、結束畫面、按鈕） |
 | `constants.ts` | 遊戲常數、跳躍配置、金幣配置、精靈座標、玩家顏色 |
 | `utils.ts` | 緩動函數、數學工具、碰撞檢測 |
 | `character.ts` | 跳躍狀態機、擠壓伸展、角色繪製、彩色精靈圖預渲染 |
@@ -161,7 +179,18 @@ gameLoop(timestamp)
 | `particles.ts` | 粒子建立、更新、繪製（灰塵+金幣特效） |
 | `effects.ts` | 殘影系統、速度線、螢幕震動 |
 | `players.ts` | 玩家列表管理、加入/離開/鎖定、排行榜 |
-| `dom-ui.ts` | DOM UI 建立/更新/銷毀（等候室、倒數、分數、結束畫面、按鈕） |
+
+#### Shake It 遊戲模組
+
+| 模組 | 職責 |
+|------|------|
+| `index.ts` | GameModule 實作、盲玩狀態機、結果收集、派對背景 |
+| `ui-state.ts` | Vue reactive 狀態物件（含 RESULT_PENDING 狀態） |
+| `ShakeItUI.vue` | 遊戲 UI 元件（等候室、盲玩計時器、結果等待、排行榜） |
+| `constants.ts` | 遊戲常數、派對背景光點配置、8 色玩家系統 |
+| `character.ts` | 搖晃角色繪製、sin 曲線動畫、彩色精靈圖預渲染 |
+| `effects.ts` | 螢幕震動 |
+| `players.ts` | 多人玩家管理（最多 8 人）、結果提交、排行榜 |
 
 ### Cast Integration
 - **Application ID**: `DD35BB50`
@@ -204,7 +233,7 @@ gameLoop(timestamp)
 2. **避免 `ctx.filter`** — 彩色精靈圖用 `hue-rotate` 在 init 時預渲染一次，不在每幀使用
 3. **控制粒子數量** — 落地粒子 6 個、金幣粒子 5 個、速度線 4 條、星空 40 顆
 4. **預計算常數值** — 星空顏色等不變的值在初始化時計算
-5. **DOM 更新快取比對** — 值不變時不寫入 DOM
+5. **Vue reactive state** — 遊戲 UI 透過 Vue reactive 驅動，Vue 自動差異比對，避免不必要的 DOM 更新
 6. **Canvas 半解析度** — `CANVAS_SCALE = 0.5`，用 CSS 放大到全螢幕
 
 ## Development Guidelines
@@ -225,7 +254,7 @@ gameLoop(timestamp)
 - Vue 3 Composition API + `<script setup>`
 - 遊戲模組使用 module-level 狀態（`let` 變數），不用 class
 - 每個模組職責單一，避免循環依賴
-- 遊戲 DOM 元素的 CSS class 使用遊戲前綴（如 `squat-`）
+- 遊戲 UI 使用 Vue 元件 + `<style scoped>`，CSS class 使用遊戲前綴（如 `squat-`、`shake-`）
 
 ### 魔術數字規則（AI 必讀）
 撰寫或修改程式碼時，**必須**遵守以下規則：
@@ -248,17 +277,20 @@ gameLoop(timestamp)
 3. **必須測試的**：狀態機轉換、碰撞檢測、數學工具、資料管理（CRUD/排序/篩選）
 4. **不需測試的**：Canvas 繪製函數、DOM 操作、純視覺效果
 5. **Mock 策略**：有副作用的模組（particles、effects）使用 `vi.mock()` 隔離
-6. **現有測試**（74 個，全數通過）：
-   - `utils.test.ts` — 緩動函數、clamp、lerp、randomRange、circleCollision
-   - `players.test.ts` — 玩家加入/離開/鎖定、位置分配、跳躍觸發、排行榜
-   - `character.test.ts` — 7 階段跳躍狀態機轉換、squash/stretch、高度約束
+6. **現有測試**（103 個，全數通過）：
+   - `squat-jump/utils.test.ts` — 緩動函數、clamp、lerp、randomRange、circleCollision
+   - `squat-jump/players.test.ts` — 玩家加入/離開/鎖定、位置分配、跳躍觸發、排行榜
+   - `squat-jump/character.test.ts` — 7 階段跳躍狀態機轉換、squash/stretch、高度約束
+   - `shake-it/players.test.ts` — 8 人玩家管理、結果提交、排行榜
+   - `shake-it/character.test.ts` — 搖晃動畫數學函數
 
 ### Adding New Games
 1. 在 `src/games/[game-name]/` 建立模組目錄
-2. 實作 `GameModule` 介面（參考 `squat-jump/index.ts`）
-3. 在 `game-registry.ts` 註冊（設定 `available: true` 和 `module` 動態 import）
-4. 遊戲 UI 元素注入到 `domContainer`，`destroy()` 時清除
-5. CSS class 加遊戲名前綴，透過動態 `<style>` 注入/移除
+2. 建立 `ui-state.ts` — 定義 `reactive()` 狀態物件（遊戲邏輯更新此物件）
+3. 建立 `GameUI.vue` — UI 元件，綁定 reactive state，使用 `<style scoped>`
+4. 實作 `GameModule` 介面（參考 `squat-jump/index.ts`），`getUIComponent()` 回傳 Vue 元件
+5. 在 `game-registry.ts` 註冊（設定 `available: true` 和 `module` 動態 import）
+6. 遊戲邏輯只更新 reactive state，不直接操作 DOM
 
 ## Configuration (constants.ts)
 
@@ -357,10 +389,10 @@ npm run build    # vue-tsc 型別檢查 + Vite 建置
 | Cast 連接失敗 | 確認 namespace 和 Application ID 正確 |
 | 字體未載入 | 檢查網路連線（Google Fonts CDN）|
 | 遊戲模組載入失敗 | 確認 `game-registry.ts` 的 `module` 路徑正確 |
-| 遊戲 UI 無法點擊 | 確認按鈕有 `pointer-events: auto`（#textLayer 預設 none） |
+| 遊戲 UI 無法點擊 | 確認按鈕有 `pointer-events: auto`（overlay 預設 `pointer-events: none`） |
 | 玩家無法加入 | 確認遊戲狀態為 `START_SCREEN`，且未超過 4 人 |
 | 多人跳躍無效 | 確認 `playerId` 正確對應已加入的玩家 |
-| 遊戲 CSS 衝突 | 確認 class 使用遊戲名前綴（如 `squat-`） |
+| 遊戲 CSS 衝突 | Vue `<style scoped>` 已隔離，但 class 仍建議使用遊戲名前綴（如 `squat-`、`shake-`） |
 
 ## Claude Code Hooks 整合
 
@@ -429,9 +461,9 @@ npm run build    # vue-tsc 型別檢查 + Vite 建置
 3. 持續執行型別檢查（`npm run build`）
 4. **Code Review（build 通過後必做）**：自動做一輪 code review，檢查以下項目並告知使用者結果
    - **效能**：是否違反 Chromecast v3 優化原則（每幀 canvas resize、ctx.filter、粒子過多等）
-   - **Pattern 一致性**：是否遵循現有 code style（module-level 狀態、CSS 前綴、DOM 容器注入）
-   - **安全性**：是否有 XSS 風險（DOM 操作）、未處理的 edge case
-   - **Clean up**：destroy() 是否清除所有 DOM 元素和事件監聽
+   - **Pattern 一致性**：是否遵循現有 code style（module-level 狀態、Vue reactive state、scoped CSS）
+   - **安全性**：是否有未處理的 edge case
+   - **Clean up**：destroy() 是否呼叫 resetUIState() 並清除事件監聽
    - 有問題就修正，全部通過後才進入收尾
 5. **收尾步驟（不可跳過）**：
    - 將新的架構資訊更新到 CLAUDE.md（新模組職責、新的 Cast 訊息、新的設定常數等）

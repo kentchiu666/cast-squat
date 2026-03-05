@@ -25,21 +25,8 @@ import {
   getLeaderboard,
   setCharacterCount,
 } from './players'
-import {
-  createGameDOM,
-  destroyGameDOM,
-  showStartScreen,
-  showCountdown,
-  showPlaying,
-  showResultPending,
-  showGameOver,
-  triggerCountdownPop,
-  updateTimer,
-  updateResultPendingPlayer,
-  updateResultCountdown,
-  updatePlayerList,
-  updateGameOverContent,
-} from './dom-ui'
+import { uiState, resetUIState } from './ui-state'
+import ShakeItUI from './ShakeItUI.vue'
 
 // === 模組級狀態 ===
 let gameState: GameState = 'START_SCREEN'
@@ -159,22 +146,29 @@ function changeState(newState: GameState): void {
     _broadcastFn({ type: 'STATE_UPDATE', state: newState })
   }
 
+  uiState.gameState = newState
+
   switch (newState) {
     case 'START_SCREEN':
-      showStartScreen()
+      uiState.actionButtonText = 'START GAME'
       break
     case 'COUNTDOWN':
-      showCountdown()
+      uiState.actionButtonText = 'GET READY!'
+      uiState.countdownText = ''
       break
     case 'PLAYING':
-      showPlaying()
+      uiState.actionButtonText = 'SHAKE!'
+      uiState.isMultiplayer = isMultiplayerMode()
+      uiState.countdownText = ''
       break
     case 'RESULT_PENDING':
-      showResultPending(getPlayers())
+      uiState.actionButtonText = 'WAITING...'
+      uiState.players = [...getPlayers()]
       break
     case 'GAME_OVER':
-      showGameOver()
-      updateGameOverContent(isMultiplayerMode(), getLeaderboard(), finalScore)
+      uiState.actionButtonText = 'RESTART'
+      uiState.leaderboard = getLeaderboard()
+      uiState.finalScore = finalScore
       break
   }
 }
@@ -230,7 +224,10 @@ function startDOMCountdown(): void {
   for (let i = 0; i < numbers.length; i++) {
     const item = numbers[i]!
     const tid = setTimeout(() => {
-      triggerCountdownPop(item.text, item.color, item.fontSize)
+      uiState.countdownText = item.text
+      uiState.countdownColor = item.color
+      uiState.countdownFontSize = item.fontSize
+      uiState.countdownKey++
     }, i * 1000)
     countdownTimeouts.push(tid)
   }
@@ -284,7 +281,7 @@ function enterResultPending(): void {
   resultCheckInterval = setInterval(() => {
     const elapsed = Math.floor((Date.now() - resultPendingStartTime) / 1000)
     const remaining = RESULT_TIMEOUT - elapsed
-    updateResultCountdown(Math.max(remaining, 0))
+    uiState.resultCountdown = `Timeout in ${Math.max(remaining, 0)}s`
 
     if (allPlayersSubmitted() || elapsed >= RESULT_TIMEOUT) {
       clearResultCheckInterval()
@@ -313,7 +310,8 @@ function handleGameResult(playerId: string, score: number): void {
   if (gameState !== 'RESULT_PENDING') return
 
   if (submitPlayerResult(playerId, score)) {
-    updateResultPendingPlayer(playerId)
+    // Vue 會自動追蹤 players 陣列中的 hasSubmitted 變化
+    uiState.players = [...getPlayers()]
   }
 
   if (allPlayersSubmitted()) {
@@ -337,6 +335,7 @@ function handlePlayerJoin(playerId: string, playerName: string, senderId?: strin
 
   if (addPlayerToList(playerId, playerName)) {
     const player = getPlayerById(playerId)
+    uiState.players = [...getPlayers()]
     replyTo(senderId, { type: 'JOIN_RESULT', success: true, colorIndex: player?.colorIndex ?? 0 })
     replyTo(senderId, { type: 'STATE_UPDATE', state: gameState })
   } else {
@@ -369,7 +368,7 @@ function handleStructuredMessage(data: Exclude<CastMessageData, string>, senderI
     case 'PLAYER_LEAVE':
       if (gameState === 'START_SCREEN') {
         removePlayerFromList(data.playerId)
-        updatePlayerList(getPlayers())
+        uiState.players = [...getPlayers()]
       }
       break
 
@@ -411,13 +410,13 @@ const ShakeItGame: GameModule = {
   id: 'shake_it',
   name: 'Shake It!',
 
-  init(_canvas, _ctx, characterSheets, _itemSpritesheet, domContainer) {
+  init(_canvas, _ctx, characterSheets, _itemSpritesheet) {
     logicalWidth = globalThis.innerWidth
     logicalHeight = globalThis.innerHeight
 
     initColoredSpritesheets(characterSheets)
     setCharacterCount(characterSheets.filter(Boolean).length)
-    createGameDOM(domContainer, handleAction)
+    uiState.onAction = handleAction
     initPartyLights()
 
     globalThis.addEventListener('resize', handleResize)
@@ -442,7 +441,7 @@ const ShakeItGame: GameModule = {
     this.stop()
     resetPlayers()
     resetEffects()
-    destroyGameDOM()
+    resetUIState()
     globalThis.removeEventListener('resize', handleResize)
 
     destroyCharacterSprites()
@@ -468,6 +467,10 @@ const ShakeItGame: GameModule = {
     return gameState
   },
 
+  getUIComponent() {
+    return ShakeItUI
+  },
+
   setBroadcastCallbacks(broadcastFn, replyFn) {
     _broadcastFn = broadcastFn
     _replyFn = replyFn
@@ -490,7 +493,7 @@ const ShakeItGame: GameModule = {
 
     switch (gameState) {
       case 'START_SCREEN':
-        updatePlayerList(getPlayers())
+        uiState.players = [...getPlayers()]
         break
       case 'COUNTDOWN':
         drawFloor(ctx)
@@ -503,7 +506,7 @@ const ShakeItGame: GameModule = {
         }
         break
       case 'PLAYING': {
-        updateTimer(timer)
+        uiState.timer = timer
         const screenShake = getScreenShake()
         ctx.save()
         ctx.translate(screenShake.x, screenShake.y)

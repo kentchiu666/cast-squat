@@ -1,15 +1,18 @@
+import type { Component } from 'vue'
+
 // === 遊戲模組統一介面 ===
 export interface GameModule {
   id: string
   name: string
 
-  init(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, characterSheets: HTMLImageElement[], itemSpritesheet: HTMLImageElement | null, domContainer: HTMLElement): void
+  init(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, characterSheets: HTMLImageElement[], itemSpritesheet: HTMLImageElement | null): void
   start(): void
   stop(): void
   destroy(): void
 
   handleMessage(data: CastMessageData, senderId?: string): void
   getState(): string
+  getUIComponent(): Component
 
   setBroadcastCallbacks(broadcastFn: BroadcastFn, replyFn: ReplyFn): void
   setReturnToLobbyCallback?(fn: () => void): void
@@ -80,8 +83,6 @@ export interface Player {
   squatCount: number
   coinScore: number
   jumpState: JumpState
-  _scoreEl?: HTMLElement
-  _cachedTotal?: number
 }
 
 // === 跳躍狀態 ===

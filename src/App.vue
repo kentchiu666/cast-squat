@@ -3,14 +3,16 @@
     <!-- Canvas 遊戲繪圖層 -->
     <canvas ref="canvasRef" id="gameCanvas"></canvas>
 
-    <!-- DOM UI 層（Vue 元件）-->
-    <div id="textLayer" ref="textLayerRef" :key="textLayerKey">
+    <!-- Vue 管理：LOBBY -->
+    <div id="lobbyLayer" v-show="platformState === 'LOBBY'">
       <LobbyScreen
-        v-if="platformState === 'LOBBY'"
         ref="lobbyRef"
         @select-game="handleGameSelect"
       />
     </div>
+
+    <!-- Vue 管理：遊戲 UI（動態元件）-->
+    <component v-if="activeGameUI" :is="activeGameUI" />
 
     <!-- FPS 計數器（直接 DOM）-->
     <div id="fps" ref="fpsRef">0 FPS</div>
@@ -22,13 +24,14 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, provide, nextTick, onMounted, onUnmounted } from 'vue'
+import type { Component } from 'vue'
 import LobbyScreen from './components/LobbyScreen.vue'
 import type { GameModule, PlatformState, CastMessageData, GameInfoSlim } from './types/game'
 import { getGameById, GAMES } from './game-registry'
 
 // === 平台狀態 ===
 const platformState = ref<PlatformState>('LOBBY')
-const textLayerKey = ref(0)
+const activeGameUI = shallowRef<Component | null>(null)
 const fpsRef = ref<HTMLElement | null>(null)
 let fpsValue = 0
 
@@ -69,7 +72,6 @@ function updateDebugStatus(): void {
 
 // === Canvas 參考 ===
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const textLayerRef = ref<HTMLElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
 const characterSheets = shallowRef<HTMLImageElement[]>([])
 let itemSpritesheet: HTMLImageElement | null = null
@@ -434,8 +436,8 @@ function updateFPS() {
 async function handleGameSelect(gameId: string) {
   const gameInfo = getGameById(gameId)
   addDebug(`SELECT: ${gameId} found=${!!gameInfo?.module}`)
-  if (!gameInfo?.module || !canvasRef.value || !ctx || !textLayerRef.value) {
-    addDebug(`ABORT: canvas=${!!canvasRef.value} ctx=${!!ctx} text=${!!textLayerRef.value}`)
+  if (!gameInfo?.module || !canvasRef.value || !ctx) {
+    addDebug(`ABORT: canvas=${!!canvasRef.value} ctx=${!!ctx}`)
     return
   }
   if (characterSheets.value.filter(Boolean).length === 0) {
@@ -451,10 +453,11 @@ async function handleGameSelect(gameId: string) {
     activeGameId.value = gameId
 
     addDebug(`INIT: ${activeGame.id} sheets=${characterSheets.value.filter(Boolean).length} item=${!!itemSpritesheet}`)
-    activeGame.init(canvasRef.value, ctx, characterSheets.value, itemSpritesheet, textLayerRef.value)
+    activeGame.init(canvasRef.value, ctx, characterSheets.value, itemSpritesheet)
     addDebug(`INIT done`)
     activeGame.setBroadcastCallbacks(castBroadcast, castReply)
     activeGame.setReturnToLobbyCallback?.(() => handleReturnToLobby())
+    activeGameUI.value = activeGame.getUIComponent()
     activeGame.start()
     platformState.value = 'GAME_ACTIVE'
     addDebug(`STARTED: ${gameId}`)
@@ -479,8 +482,8 @@ function handleReturnToLobby() {
     activeGame = null
   }
   activeGameId.value = null
+  activeGameUI.value = null
   platformState.value = 'LOBBY'
-  textLayerKey.value++  // 強制 Vue 重建 textLayer DOM
   addDebug('platformState → LOBBY')
   updateDebugStatus()
   broadcastPlatformState()
@@ -594,7 +597,7 @@ body {
   display: block;
 }
 
-#textLayer {
+#lobbyLayer {
   position: absolute;
   top: 0;
   left: 0;
