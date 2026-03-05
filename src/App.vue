@@ -285,6 +285,7 @@ let animFrameId = 0
 // === FPS 計數器 ===
 let fpsFrameCount = 0
 let fpsLastTime = 0
+let debugFrameCount = 0
 
 // === Canvas 初始化 ===
 function resizeCanvas() {
@@ -340,20 +341,44 @@ function renderStarfield() {
 }
 
 // === 主迴圈 ===
+let loopErrorLogged = false
+
 function gameLoop(timestamp: number) {
+  animFrameId = requestAnimationFrame(gameLoop)
+
   if (lastFrameTime === 0) lastFrameTime = timestamp
   const dt = Math.min(timestamp - lastFrameTime, 100)
   lastFrameTime = timestamp
 
   tickAccumulator += dt
   while (tickAccumulator >= TICK_MS) {
-    tick()
+    try {
+      tick()
+    } catch (e) {
+      if (!loopErrorLogged) {
+        addDebug(`TICK ERR: ${e instanceof Error ? e.message : String(e)}`)
+        loopErrorLogged = true
+      }
+    }
     tickAccumulator -= TICK_MS
   }
 
-  render()
+  try {
+    render()
+  } catch (e) {
+    if (!loopErrorLogged) {
+      addDebug(`RENDER ERR: ${e instanceof Error ? e.message : String(e)}`)
+      loopErrorLogged = true
+    }
+  }
   updateFPS()
-  animFrameId = requestAnimationFrame(gameLoop)
+
+  // 每 120 幀記錄一次狀態
+  debugFrameCount++
+  if (debugFrameCount % 120 === 0) {
+    const gs = activeGame?.getState() ?? 'N/A'
+    addDebug(`F${debugFrameCount} gs=${gs} fps=${fps.value} ${logicalWidth}x${logicalHeight}`)
+  }
 }
 
 function tick() {
