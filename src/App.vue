@@ -12,14 +12,11 @@
       />
     </div>
 
-    <!-- FPS 計數器 -->
-    <div id="fps">{{ fps }} FPS</div>
+    <!-- FPS 計數器（直接 DOM）-->
+    <div id="fps" ref="fpsRef">0 FPS</div>
 
-    <!-- Cast 除錯面板 -->
-    <div id="cast-debug">
-      <div>P:{{ platformState }} G:{{ activeGameId ?? 'none' }}</div>
-      <div v-for="(msg, i) in debugMessages" :key="i">{{ msg }}</div>
-    </div>
+    <!-- Cast 除錯面板（直接 DOM，不走 Vue reactivity）-->
+    <div id="cast-debug" ref="debugPanelRef"></div>
   </div>
 </template>
 
@@ -31,19 +28,42 @@ import { getGameById, GAMES } from './game-registry'
 
 // === 平台狀態 ===
 const platformState = ref<PlatformState>('LOBBY')
-const fps = ref(0)
+const fpsRef = ref<HTMLElement | null>(null)
+let fpsValue = 0
 
-// === 除錯面板 ===
-const debugMessages = ref<string[]>([])
+// === 除錯面板（直接 DOM 操作，繞過 Vue）===
+const debugPanelRef = ref<HTMLElement | null>(null)
 const activeGameId = ref<string | null>(null)
 const MAX_DEBUG_MESSAGES = 15
 
 function addDebug(msg: string): void {
+  const panel = debugPanelRef.value
+  if (!panel) return
   const ts = new Date().toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  debugMessages.value.unshift(`[${ts}] ${msg}`)
-  if (debugMessages.value.length > MAX_DEBUG_MESSAGES) {
-    debugMessages.value.length = MAX_DEBUG_MESSAGES
+  const line = document.createElement('div')
+  line.textContent = `[${ts}] ${msg}`
+  // 插入到狀態行之後（第一個子元素之後）
+  if (panel.children.length > 1) {
+    panel.insertBefore(line, panel.children[1] ?? null)
+  } else {
+    panel.appendChild(line)
   }
+  // 限制數量（+1 是狀態行）
+  while (panel.children.length > MAX_DEBUG_MESSAGES + 1) {
+    panel.lastChild!.remove()
+  }
+}
+
+function updateDebugStatus(): void {
+  const panel = debugPanelRef.value
+  if (!panel) return
+  let statusLine = panel.firstElementChild as HTMLElement | null
+  if (!statusLine || !statusLine.dataset.status) {
+    statusLine = document.createElement('div')
+    statusLine.dataset.status = '1'
+    panel.prepend(statusLine)
+  }
+  statusLine.textContent = `P:${platformState.value} G:${activeGameId.value ?? 'none'}`
 }
 
 // === Canvas 參考 ===
@@ -382,7 +402,7 @@ function gameLoop(timestamp: number) {
   debugFrameCount++
   if (debugFrameCount % 300 === 0) {
     const gs = activeGame?.getState() ?? 'N/A'
-    addDebug(`F${debugFrameCount} gs=${gs} fps=${fps.value} ${logicalWidth}x${logicalHeight}`)
+    addDebug(`F${debugFrameCount} gs=${gs} fps=${fpsValue} ${logicalWidth}x${logicalHeight}`)
   }
 }
 
@@ -402,7 +422,8 @@ function updateFPS() {
   fpsFrameCount++
   const now = performance.now()
   if (now - fpsLastTime >= 1000) {
-    fps.value = fpsFrameCount
+    fpsValue = fpsFrameCount
+    if (fpsRef.value) fpsRef.value.textContent = `${fpsValue} FPS`
     fpsFrameCount = 0
     fpsLastTime = now
   }
@@ -436,6 +457,7 @@ async function handleGameSelect(gameId: string) {
     activeGame.start()
     platformState.value = 'GAME_ACTIVE'
     addDebug(`STARTED: ${gameId}`)
+    updateDebugStatus()
     broadcastPlatformState()
   } catch (e) {
     addDebug(`ERROR: ${e instanceof Error ? e.message : String(e)}`)
@@ -458,6 +480,7 @@ function handleReturnToLobby() {
   activeGameId.value = null
   platformState.value = 'LOBBY'
   addDebug('platformState → LOBBY')
+  updateDebugStatus()
   broadcastPlatformState()
   nextTick(() => broadcastLobbyState())
 }
