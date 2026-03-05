@@ -4,7 +4,7 @@
     <canvas ref="canvasRef" id="gameCanvas"></canvas>
 
     <!-- DOM UI 層（Vue 元件）-->
-    <div id="textLayer" ref="textLayerRef">
+    <div id="textLayer" ref="textLayerRef" :key="textLayerKey">
       <LobbyScreen
         v-if="platformState === 'LOBBY'"
         ref="lobbyRef"
@@ -28,6 +28,7 @@ import { getGameById, GAMES } from './game-registry'
 
 // === 平台狀態 ===
 const platformState = ref<PlatformState>('LOBBY')
+const textLayerKey = ref(0)
 const fpsRef = ref<HTMLElement | null>(null)
 let fpsValue = 0
 
@@ -479,6 +480,7 @@ function handleReturnToLobby() {
   }
   activeGameId.value = null
   platformState.value = 'LOBBY'
+  textLayerKey.value++  // 強制 Vue 重建 textLayer DOM
   addDebug('platformState → LOBBY')
   updateDebugStatus()
   broadcastPlatformState()
