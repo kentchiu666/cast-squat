@@ -205,6 +205,7 @@ function handleCastMessage(event: { data: unknown; senderId: string }): void {
 
   // 平台級訊息（字串已在上面處理掉）
   if (typeof data === 'string') return
+  addDebug(`ACTION: ${data.action}`)
   switch (data.action) {
     case 'LOAD_GAME':
       handleGameSelect(data.gameId)
@@ -446,12 +447,17 @@ async function handleGameSelect(gameId: string) {
 function handleReturnToLobby() {
   addDebug(`RETURN_LOBBY from=${activeGameId.value}`)
   if (activeGame) {
-    activeGame.stop()
-    activeGame.destroy()
+    try {
+      activeGame.stop()
+      activeGame.destroy()
+    } catch (e) {
+      addDebug(`DESTROY ERR: ${e instanceof Error ? e.message : String(e)}`)
+    }
     activeGame = null
   }
   activeGameId.value = null
   platformState.value = 'LOBBY'
+  addDebug('platformState → LOBBY')
   broadcastPlatformState()
   nextTick(() => broadcastLobbyState())
 }
