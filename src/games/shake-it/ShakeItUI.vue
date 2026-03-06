@@ -100,65 +100,65 @@ function getColor(colorIndex: number): string {
 .shake-start-screen {
   width: 100%;
   text-align: center;
-  padding-top: 60px;
+  padding-top: 3.13vw;
 }
 
 .shake-title {
-  font-size: 48px;
+  font-size: 2.5vw;
   color: white;
   font-family: 'Press Start 2P', cursive;
 }
 
 .shake-player-count {
-  font-size: 20px;
+  font-size: 1.04vw;
   color: #888;
-  margin-top: 20px;
+  margin-top: 1.04vw;
   font-family: 'Press Start 2P', cursive;
 }
 
 .shake-player-list {
-  margin-top: 30px;
+  margin-top: 1.56vw;
 }
 
 .shake-player-entry {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 15px;
-  margin: 15px 0;
+  gap: 0.78vw;
+  margin: 0.78vw 0;
 }
 
 .shake-player-color-box {
-  width: 30px;
-  height: 30px;
+  width: 1.56vw;
+  height: 1.56vw;
   flex-shrink: 0;
 }
 
 .shake-player-name-text {
-  font-size: 16px;
+  font-size: 0.83vw;
   font-family: 'Press Start 2P', cursive;
 }
 
 .shake-waiting-msg {
-  margin-top: 40px;
-  font-size: 18px;
+  margin-top: 2.08vw;
+  font-size: 0.94vw;
   color: #888;
   line-height: 2;
   font-family: 'Press Start 2P', cursive;
 }
 
 .shake-sub {
-  font-size: 14px;
+  font-size: 0.73vw;
   display: block;
-  margin-top: 10px;
+  margin-top: 0.52vw;
 }
 
 .shake-start-hint {
   position: absolute;
-  bottom: 120px;
+  bottom: 6.25vw;
   width: 100%;
   text-align: center;
-  font-size: 18px;
+  font-size: 0.94vw;
   color: #4ECDC4;
   font-family: 'Press Start 2P', cursive;
 }
@@ -169,7 +169,7 @@ function getColor(colorIndex: number): string {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 120px;
+  font-size: 6.25vw;
   font-family: 'Press Start 2P', cursive;
   z-index: 10;
 }
@@ -193,7 +193,7 @@ function getColor(colorIndex: number): string {
   left: 50%;
   transform: translate(-50%, -50%);
   color: rgba(255, 255, 255, 0.3);
-  font-size: 160px;
+  font-size: 8.33vw;
   font-family: 'Press Start 2P', cursive;
   z-index: 1;
 }
@@ -202,11 +202,11 @@ function getColor(colorIndex: number): string {
 .shake-result-pending {
   width: 100%;
   text-align: center;
-  padding-top: 80px;
+  padding-top: 4.17vw;
 }
 
 .shake-result-pending-title {
-  font-size: 24px;
+  font-size: 1.25vw;
   color: #4ECDC4;
   font-family: 'Press Start 2P', cursive;
   animation: shakePulse 1.5s ease-in-out infinite;
@@ -218,21 +218,21 @@ function getColor(colorIndex: number): string {
 }
 
 .shake-result-player-list {
-  margin-top: 40px;
+  margin-top: 2.08vw;
 }
 
 .shake-result-entry {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 15px;
-  margin: 12px 0;
+  gap: 0.78vw;
+  margin: 0.63vw 0;
   font-family: 'Press Start 2P', cursive;
 }
 
 .shake-result-status {
-  width: 40px;
-  font-size: 20px;
+  width: 2.08vw;
+  font-size: 1.04vw;
   color: #888;
 }
 
@@ -241,12 +241,12 @@ function getColor(colorIndex: number): string {
 }
 
 .shake-result-name {
-  font-size: 16px;
+  font-size: 0.83vw;
 }
 
 .shake-result-countdown {
-  margin-top: 30px;
-  font-size: 14px;
+  margin-top: 1.56vw;
+  font-size: 0.73vw;
   color: #888;
   font-family: 'Press Start 2P', cursive;
 }
@@ -254,11 +254,11 @@ function getColor(colorIndex: number): string {
 /* 操作按鈕 */
 .shake-action-btn {
   position: absolute;
-  bottom: 40px;
+  bottom: 2.08vw;
   left: 50%;
   transform: translateX(-50%);
-  padding: 20px 40px;
-  font-size: 24px;
+  padding: 1.04vw 2.08vw;
+  font-size: 1.25vw;
   font-family: 'Press Start 2P', cursive;
   background-color: #4ECDC4;
   color: white;
@@ -281,17 +281,17 @@ function getColor(colorIndex: number): string {
 .shake-game-over-screen {
   width: 100%;
   text-align: center;
-  padding-top: 60px;
+  padding-top: 3.13vw;
 }
 
 .shake-game-over-content {
-  margin-top: 40px;
+  margin-top: 2.08vw;
 }
 
 .shake-leaderboard-title {
-  font-size: 24px;
+  font-size: 1.25vw;
   color: white;
-  margin-bottom: 30px;
+  margin-bottom: 1.56vw;
   font-family: 'Press Start 2P', cursive;
 }
 
@@ -299,32 +299,32 @@ function getColor(colorIndex: number): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 15px;
-  margin: 12px 0;
-  font-size: 16px;
+  gap: 0.78vw;
+  margin: 0.63vw 0;
+  font-size: 0.83vw;
   font-family: 'Press Start 2P', cursive;
 }
 
 .shake-rank-medal {
-  width: 60px;
+  width: 3.13vw;
   text-align: right;
 }
 
 .shake-lb-name {
-  width: 120px;
+  width: 6.25vw;
   text-align: left;
 }
 
 .shake-lb-score {
-  width: 60px;
+  width: 3.13vw;
   text-align: right;
   color: white;
 }
 
 .shake-single-result {
-  font-size: 32px;
+  font-size: 1.67vw;
   color: white;
-  margin-top: 60px;
+  margin-top: 3.13vw;
   font-family: 'Press Start 2P', cursive;
 }
 </style>

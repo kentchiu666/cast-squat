@@ -26,6 +26,17 @@ export const GAMES: GameInfo[] = [
     module: () => import('./games/shake-it/index'),
   },
   {
+    id: 'virtual_run',
+    name: 'Virtual Run',
+    description: 'Run through beautiful scenery!',
+    icon: 'VR',
+    iconColor: '#95E86B',
+    type: 'ENDURE',
+    typeLabel: 'Endure',
+    available: true,
+    module: () => import('./games/virtual-run/index'),
+  },
+  {
     id: 'pan_flip',
     name: 'Pan Flip',
     description: 'Flip the pan perfectly!',

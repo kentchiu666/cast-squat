@@ -38,8 +38,10 @@ let _broadcastFn: BroadcastFn | null = null
 let _replyFn: ReplyFn | null = null
 let _returnToLobbyFn: (() => void) | null = null
 let countdownTimeouts: ReturnType<typeof setTimeout>[] = []
-let logicalWidth = 0
-let logicalHeight = 0
+const REFERENCE_WIDTH = 1920
+const REFERENCE_HEIGHT = 1080
+let logicalWidth = REFERENCE_WIDTH
+let logicalHeight = REFERENCE_HEIGHT
 
 // RESULT_PENDING 狀態
 let resultPendingStartTime = 0
@@ -81,8 +83,9 @@ function clearResultCheckInterval(): void {
 }
 
 function handleResize(): void {
-  logicalWidth = globalThis.innerWidth
-  logicalHeight = globalThis.innerHeight
+  // 參考座標固定為 1920×1080，實際縮放由 App.vue ctx.setTransform 處理
+  logicalWidth = REFERENCE_WIDTH
+  logicalHeight = REFERENCE_HEIGHT
   bgGradient = null // 重建漸層
 }
 
@@ -215,10 +218,10 @@ function startCountdownSequence(): void {
 // === DOM 倒數動畫 ===
 function startDOMCountdown(): void {
   const numbers = [
-    { text: '3', color: '#FF6B6B', fontSize: '120px' },
-    { text: '2', color: '#FFE66D', fontSize: '120px' },
-    { text: '1', color: '#4ECDC4', fontSize: '120px' },
-    { text: 'GO!', color: '#95E86B', fontSize: '80px' },
+    { text: '3', color: '#FF6B6B', fontSize: '6.25vw' },
+    { text: '2', color: '#FFE66D', fontSize: '6.25vw' },
+    { text: '1', color: '#4ECDC4', fontSize: '6.25vw' },
+    { text: 'GO!', color: '#95E86B', fontSize: '4.17vw' },
   ]
 
   for (let i = 0; i < numbers.length; i++) {
@@ -411,8 +414,8 @@ const ShakeItGame: GameModule = {
   name: 'Shake It!',
 
   init(_canvas, _ctx, characterSheets, _itemSpritesheet) {
-    logicalWidth = globalThis.innerWidth
-    logicalHeight = globalThis.innerHeight
+    logicalWidth = REFERENCE_WIDTH
+    logicalHeight = REFERENCE_HEIGHT
 
     initColoredSpritesheets(characterSheets)
     setCharacterCount(characterSheets.filter(Boolean).length)

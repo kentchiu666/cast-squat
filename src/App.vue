@@ -275,9 +275,12 @@ function initCastReceiver(): void {
   try {
     castContext = cast.framework.CastReceiverContext.getInstance()
     castContext.addCustomMessageListener(CAST_NAMESPACE, handleCastMessage)
-    castContext.start()
-    addDebug('Cast Receiver 已啟動')
-    console.log('[Cast] Receiver 已啟動')
+    castContext.start({
+      disableIdleTimeout: true,
+      skipPlayersLoad: true,
+    })
+    addDebug('Cast Receiver 已啟動（idle timeout 已停用）')
+    console.log('[Cast] Receiver 已啟動，disableIdleTimeout=true')
   } catch (e) {
     addDebug(`Cast 初始化失敗: ${e}`)
     console.warn('[Cast] 初始化失敗:', e)
@@ -287,8 +290,10 @@ function initCastReceiver(): void {
 
 // === Canvas 尺寸 ===
 const CANVAS_SCALE = 0.5
-let logicalWidth = 0
-let logicalHeight = 0
+const REFERENCE_WIDTH = 1920
+const REFERENCE_HEIGHT = 1080
+let logicalWidth = REFERENCE_WIDTH
+let logicalHeight = REFERENCE_HEIGHT
 
 // === 星空背景 ===
 interface Star {
@@ -316,16 +321,22 @@ function resizeCanvas() {
   const canvas = canvasRef.value
   if (!canvas) return
 
-  logicalWidth = window.innerWidth
-  logicalHeight = window.innerHeight
-  canvas.width = Math.floor(logicalWidth * CANVAS_SCALE)
-  canvas.height = Math.floor(logicalHeight * CANVAS_SCALE)
-  canvas.style.width = logicalWidth + 'px'
-  canvas.style.height = logicalHeight + 'px'
+  const actualWidth = window.innerWidth
+  const actualHeight = window.innerHeight
+  canvas.width = Math.floor(actualWidth * CANVAS_SCALE)
+  canvas.height = Math.floor(actualHeight * CANVAS_SCALE)
+  canvas.style.width = actualWidth + 'px'
+  canvas.style.height = actualHeight + 'px'
+
+  // 固定參考座標系：所有繪製以 1920×1080 為基準，transform 負責實際縮放
+  logicalWidth = REFERENCE_WIDTH
+  logicalHeight = REFERENCE_HEIGHT
 
   if (ctx) {
     ctx.imageSmoothingEnabled = false
-    ctx.setTransform(CANVAS_SCALE, 0, 0, CANVAS_SCALE, 0, 0)
+    const scaleX = (actualWidth * CANVAS_SCALE) / REFERENCE_WIDTH
+    const scaleY = (actualHeight * CANVAS_SCALE) / REFERENCE_HEIGHT
+    ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0)
   }
 }
 
@@ -336,8 +347,8 @@ function setupStarfield() {
   for (let i = 0; i < 40; i++) {
     const size = Math.random() * 2 + 1
     starfield.push({
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
+      x: Math.random() * REFERENCE_WIDTH,
+      y: Math.random() * REFERENCE_HEIGHT,
       size,
       speed: Math.random() * 0.5 + 0.1,
       color: alphaLevels[Math.min(Math.floor(size), 2)]!
@@ -609,23 +620,23 @@ body {
 
 #fps {
   position: absolute;
-  bottom: 5px;
-  right: 5px;
+  bottom: 0.26vw;
+  right: 0.26vw;
   color: #0f0;
-  font-size: 12px;
+  font-size: 0.63vw;
   font-family: monospace;
   z-index: 100;
 }
 
 #cast-debug {
   position: absolute;
-  top: 5px;
-  left: 5px;
+  top: 0.26vw;
+  left: 0.26vw;
   color: #0f0;
-  font-size: 10px;
+  font-size: 0.52vw;
   font-family: monospace;
   background: rgba(0, 0, 0, 0.7);
-  padding: 4px 8px;
+  padding: 0.21vw 0.42vw;
   z-index: 200;
   max-width: 50%;
   word-break: break-all;

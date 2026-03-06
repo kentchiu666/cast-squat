@@ -25,7 +25,7 @@
         :key="i"
         class="flag"
         :class="`flag-${(i % 4) + 1}`"
-        :style="{ marginTop: flagDroop(i - 1) + 'px' }"
+        :style="{ marginTop: flagDroop(i - 1) + 'vw' }"
       ></span>
     </div>
 
@@ -51,7 +51,7 @@
 
       <div
         class="carousel-track"
-        :style="{ transform: `translateX(${trackOffset}px)` }"
+        :style="{ transform: `translateX(${trackOffset}vw)` }"
       >
         <GameCard
           v-for="(game, index) in games"
@@ -347,21 +347,16 @@ const selectedIndex = ref(0)
 
 const selectedGame = computed(() => games[selectedIndex.value]!)
 
-// === 卡片列偏移計算 ===
-const CARD_WIDTH = 280
-const CARD_GAP = 30
-const CARD_STEP = CARD_WIDTH + CARD_GAP
-const viewportWidth = ref(window.innerWidth)
+// === 卡片列偏移計算（vw 單位，基於 1920px 基準寬度）===
+const CARD_WIDTH_VW = 14.58
+const CARD_GAP_VW = 1.56
+const CARD_STEP_VW = CARD_WIDTH_VW + CARD_GAP_VW
 
 const trackOffset = computed(() => {
-  const center = viewportWidth.value / 2
-  const cardCenter = CARD_WIDTH / 2
-  return -(selectedIndex.value * CARD_STEP) + center - cardCenter
+  const centerVw = 50
+  const cardCenterVw = CARD_WIDTH_VW / 2
+  return -(selectedIndex.value * CARD_STEP_VW) + centerVw - cardCenterVw
 })
-
-function onResize() {
-  viewportWidth.value = window.innerWidth
-}
 
 // === 鍵盤控制 ===
 function onKeydown(e: KeyboardEvent) {
@@ -382,13 +377,11 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
-  window.addEventListener('resize', onResize)
   globalThis.addEventListener('keydown', onKeydown)
   mascotAnimId = requestAnimationFrame(mascotLoop)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', onResize)
   globalThis.removeEventListener('keydown', onKeydown)
   cancelAnimationFrame(mascotAnimId)
   clearTimeout(reactionTimeout)
@@ -400,7 +393,7 @@ function flagDroop(index: number): number {
   const pos = index % half
   const mid = (half - 1) / 2
   const t = Math.abs(pos - mid) / mid
-  return Math.round((1 - t * t) * 44)
+  return +((1 - t * t) * 2.29).toFixed(2)
 }
 
 // === 事件處理 ===
@@ -439,13 +432,13 @@ defineExpose({
   background-image:
     repeating-linear-gradient(
       0deg,
-      transparent 0px, transparent 3px,
-      rgba(0, 0, 0, 0.04) 3px, rgba(0, 0, 0, 0.04) 4px
+      transparent 0px, transparent 0.16vw,
+      rgba(0, 0, 0, 0.04) 0.16vw, rgba(0, 0, 0, 0.04) 0.21vw
     ),
     repeating-linear-gradient(
       90deg,
-      transparent 0px, transparent 3px,
-      rgba(0, 0, 0, 0.04) 3px, rgba(0, 0, 0, 0.04) 4px
+      transparent 0px, transparent 0.16vw,
+      rgba(0, 0, 0, 0.04) 0.16vw, rgba(0, 0, 0, 0.04) 0.21vw
     );
   position: relative;
   overflow: hidden;
@@ -454,42 +447,42 @@ defineExpose({
 /* === 像素雲 (用 box-shadow 拼像素) === */
 .cloud {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 0.42vw;
+  height: 0.42vw;
   background: white;
   opacity: 0.8;
-  /* 用 box-shadow 畫出雲朵形狀（每個 8x8 方塊） */
+  /* 用 box-shadow 畫出雲朵形狀（每個 0.42vw 方塊） */
   box-shadow:
-    8px 0 0 white,
-    16px 0 0 white,
-    24px 0 0 white,
-    32px 0 0 white,
-    -8px 8px 0 white,
-    0px 8px 0 white,
-    8px 8px 0 white,
-    16px 8px 0 white,
-    24px 8px 0 white,
-    32px 8px 0 white,
-    40px 8px 0 white,
-    -8px 16px 0 white,
-    0px 16px 0 white,
-    8px 16px 0 white,
-    16px 16px 0 white,
-    24px 16px 0 white,
-    32px 16px 0 white,
-    40px 16px 0 white;
+    0.42vw 0 0 white,
+    0.83vw 0 0 white,
+    1.25vw 0 0 white,
+    1.67vw 0 0 white,
+    -0.42vw 0.42vw 0 white,
+    0px 0.42vw 0 white,
+    0.42vw 0.42vw 0 white,
+    0.83vw 0.42vw 0 white,
+    1.25vw 0.42vw 0 white,
+    1.67vw 0.42vw 0 white,
+    2.08vw 0.42vw 0 white,
+    -0.42vw 0.83vw 0 white,
+    0px 0.83vw 0 white,
+    0.42vw 0.83vw 0 white,
+    0.83vw 0.83vw 0 white,
+    1.25vw 0.83vw 0 white,
+    1.67vw 0.83vw 0 white,
+    2.08vw 0.83vw 0 white;
   animation: cloudDrift linear infinite;
 }
 
 .cloud-1 {
   top: 8%;
-  left: -60px;
+  left: -3.13vw;
   animation-duration: 30s;
 }
 
 .cloud-2 {
   top: 18%;
-  left: -60px;
+  left: -3.13vw;
   animation-duration: 45s;
   animation-delay: -15s;
   transform: scale(0.7);
@@ -498,7 +491,7 @@ defineExpose({
 
 .cloud-3 {
   top: 12%;
-  left: -60px;
+  left: -3.13vw;
   animation-duration: 35s;
   animation-delay: -25s;
   transform: scale(0.85);
@@ -507,7 +500,7 @@ defineExpose({
 
 .cloud-4 {
   top: 22%;
-  left: -60px;
+  left: -3.13vw;
   animation-duration: 50s;
   animation-delay: -35s;
   transform: scale(0.6);
@@ -515,96 +508,96 @@ defineExpose({
 }
 
 @keyframes cloudDrift {
-  from { left: -80px; }
+  from { left: -4.17vw; }
   to { left: 110%; }
 }
 
 /* === 像素太陽 === */
 .sun {
   position: absolute;
-  top: 20px;
-  right: 50px;
-  width: 16px;
-  height: 16px;
+  top: 1.04vw;
+  right: 2.6vw;
+  width: 0.83vw;
+  height: 0.83vw;
   background: #FFE66D;
   z-index: 0;
-  /* 5x5 核心（每塊 16px）*/
+  /* 5x5 核心（每塊 0.83vw）*/
   box-shadow:
-    16px 0 0 #FFE66D,
-    32px 0 0 #FFE66D,
-    48px 0 0 #FFE66D,
-    64px 0 0 #FFE66D,
-    -16px 16px 0 #FFE66D,
-    0 16px 0 #FFE66D,
-    16px 16px 0 #FFF176,
-    32px 16px 0 #FFF176,
-    48px 16px 0 #FFE66D,
-    64px 16px 0 #FFE66D,
-    80px 16px 0 #FFE66D,
-    -16px 32px 0 #FFE66D,
-    0 32px 0 #FFF176,
-    16px 32px 0 #FFF9C4,
-    32px 32px 0 #FFF9C4,
-    48px 32px 0 #FFF176,
-    64px 32px 0 #FFE66D,
-    80px 32px 0 #FFE66D,
-    -16px 48px 0 #FFE66D,
-    0 48px 0 #FFE66D,
-    16px 48px 0 #FFF176,
-    32px 48px 0 #FFF176,
-    48px 48px 0 #FFE66D,
-    64px 48px 0 #FFE66D,
-    80px 48px 0 #FFE66D,
-    0 64px 0 #FFE66D,
-    16px 64px 0 #FFE66D,
-    32px 64px 0 #FFE66D,
-    48px 64px 0 #FFE66D,
-    64px 64px 0 #FFE66D;
+    0.83vw 0 0 #FFE66D,
+    1.67vw 0 0 #FFE66D,
+    2.5vw 0 0 #FFE66D,
+    3.33vw 0 0 #FFE66D,
+    -0.83vw 0.83vw 0 #FFE66D,
+    0 0.83vw 0 #FFE66D,
+    0.83vw 0.83vw 0 #FFF176,
+    1.67vw 0.83vw 0 #FFF176,
+    2.5vw 0.83vw 0 #FFE66D,
+    3.33vw 0.83vw 0 #FFE66D,
+    4.17vw 0.83vw 0 #FFE66D,
+    -0.83vw 1.67vw 0 #FFE66D,
+    0 1.67vw 0 #FFF176,
+    0.83vw 1.67vw 0 #FFF9C4,
+    1.67vw 1.67vw 0 #FFF9C4,
+    2.5vw 1.67vw 0 #FFF176,
+    3.33vw 1.67vw 0 #FFE66D,
+    4.17vw 1.67vw 0 #FFE66D,
+    -0.83vw 2.5vw 0 #FFE66D,
+    0 2.5vw 0 #FFE66D,
+    0.83vw 2.5vw 0 #FFF176,
+    1.67vw 2.5vw 0 #FFF176,
+    2.5vw 2.5vw 0 #FFE66D,
+    3.33vw 2.5vw 0 #FFE66D,
+    4.17vw 2.5vw 0 #FFE66D,
+    0 3.33vw 0 #FFE66D,
+    0.83vw 3.33vw 0 #FFE66D,
+    1.67vw 3.33vw 0 #FFE66D,
+    2.5vw 3.33vw 0 #FFE66D,
+    3.33vw 3.33vw 0 #FFE66D;
   animation: sunPulse 3s ease-in-out infinite;
 }
 
 /* 旋轉光芒（獨立元素，可以旋轉而不影響核心）*/
 .sun-rays {
   position: absolute;
-  top: 40px;
-  left: 40px;
-  width: 16px;
-  height: 16px;
+  top: 2.08vw;
+  left: 2.08vw;
+  width: 0.83vw;
+  height: 0.83vw;
   transform: translate(-50%, -50%);
-  /* 八方向光芒（從核心邊緣 64px 開始，避免吃到中心）*/
+  /* 八方向光芒（從核心邊緣開始，避免吃到中心）*/
   box-shadow:
     /* 上 */
-    0 -64px 0 #FFD93D,
-    0 -80px 0 #FFD93D,
-    0 -96px 0 #FFECB3,
+    0 -3.33vw 0 #FFD93D,
+    0 -4.17vw 0 #FFD93D,
+    0 -5vw 0 #FFECB3,
     /* 下 */
-    0 64px 0 #FFD93D,
-    0 80px 0 #FFD93D,
-    0 96px 0 #FFECB3,
+    0 3.33vw 0 #FFD93D,
+    0 4.17vw 0 #FFD93D,
+    0 5vw 0 #FFECB3,
     /* 左 */
-    -64px 0 0 #FFD93D,
-    -80px 0 0 #FFD93D,
-    -96px 0 0 #FFECB3,
+    -3.33vw 0 0 #FFD93D,
+    -4.17vw 0 0 #FFD93D,
+    -5vw 0 0 #FFECB3,
     /* 右 */
-    64px 0 0 #FFD93D,
-    80px 0 0 #FFD93D,
-    96px 0 0 #FFECB3,
+    3.33vw 0 0 #FFD93D,
+    4.17vw 0 0 #FFD93D,
+    5vw 0 0 #FFECB3,
     /* 左上 */
-    -48px -48px 0 #FFD93D,
-    -64px -64px 0 #FFD93D,
-    -80px -80px 0 #FFECB3,
+    -2.5vw -2.5vw 0 #FFD93D,
+    -3.33vw -3.33vw 0 #FFD93D,
+    -4.17vw -4.17vw 0 #FFECB3,
     /* 右上 */
-    48px -48px 0 #FFD93D,
-    64px -64px 0 #FFD93D,
-    80px -80px 0 #FFECB3,
+    2.5vw -2.5vw 0 #FFD93D,
+    3.33vw -3.33vw 0 #FFD93D,
+    4.17vw -4.17vw 0 #FFECB3,
     /* 左下 */
-    -48px 48px 0 #FFD93D,
-    -64px 64px 0 #FFD93D,
-    -80px 80px 0 #FFECB3,
+    -2.5vw 2.5vw 0 #FFD93D,
+    -3.33vw 3.33vw 0 #FFD93D,
+    -4.17vw 4.17vw 0 #FFECB3,
     /* 右下 */
-    48px 48px 0 #FFD93D,
-    64px 64px 0 #FFD93D,
-    80px 80px 0 #FFECB3;
+    2.5vw 2.5vw 0 #FFD93D,
+    3.33vw 3.33vw 0 #FFD93D,
+    4.17vw 4.17vw 0 #FFECB3;
   animation: sunRaysRotate 12s linear infinite;
 }
 
@@ -621,15 +614,15 @@ defineExpose({
 /* === 閃爍星星 === */
 .sparkle {
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: 0.21vw;
+  height: 0.21vw;
   background: white;
   z-index: 1;
   box-shadow:
-    -4px 0 0 white,
-    4px 0 0 white,
-    0 -4px 0 white,
-    0 4px 0 white;
+    -0.21vw 0 0 white,
+    0.21vw 0 0 white,
+    0 -0.21vw 0 white,
+    0 0.21vw 0 white;
   animation: sparkleBlink ease-in-out infinite;
 }
 
@@ -647,21 +640,21 @@ defineExpose({
 /* === 三角旗幟（像素風） === */
 .bunting {
   display: flex;
-  gap: 4px;
+  gap: 0.21vw;
   position: absolute;
-  top: 8px;
+  top: 0.42vw;
   left: 0;
   right: 0;
   justify-content: center;
   align-items: flex-start;
   z-index: 1;
-  padding-top: 6px;
+  padding-top: 0.31vw;
 }
 
 .flag {
   display: inline-block;
-  width: 60px;
-  height: 60px;
+  width: 3.13vw;
+  height: 3.13vw;
   position: relative;
   transform-origin: top center;
 }
@@ -670,10 +663,10 @@ defineExpose({
 .flag::before {
   content: '';
   position: absolute;
-  top: -12px;
-  left: 24px;
-  width: 12px;
-  height: 12px;
+  top: -0.63vw;
+  left: 1.25vw;
+  width: 0.63vw;
+  height: 0.63vw;
   background: #6D4C41;
 }
 
@@ -685,37 +678,37 @@ defineExpose({
   animation: flagSwingB 3s ease-in-out infinite;
 }
 
-/* 用 box-shadow 拼出像素三角形（12px 方塊）*/
+/* 用 box-shadow 拼出像素三角形（0.63vw 方塊）*/
 .flag::after {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
-  width: 12px;
-  height: 12px;
+  width: 0.63vw;
+  height: 0.63vw;
   background: currentColor;
   box-shadow:
     /* Row 0: 5 blocks */
-    12px 0 0 currentColor,
-    24px 0 0 currentColor,
-    36px 0 0 currentColor,
-    48px 0 0 currentColor,
+    0.63vw 0 0 currentColor,
+    1.25vw 0 0 currentColor,
+    1.88vw 0 0 currentColor,
+    2.5vw 0 0 currentColor,
     /* Row 1: 5 blocks */
-    0 12px 0 currentColor,
-    12px 12px 0 currentColor,
-    24px 12px 0 currentColor,
-    36px 12px 0 currentColor,
-    48px 12px 0 currentColor,
+    0 0.63vw 0 currentColor,
+    0.63vw 0.63vw 0 currentColor,
+    1.25vw 0.63vw 0 currentColor,
+    1.88vw 0.63vw 0 currentColor,
+    2.5vw 0.63vw 0 currentColor,
     /* Row 2: 3 blocks */
-    12px 24px 0 currentColor,
-    24px 24px 0 currentColor,
-    36px 24px 0 currentColor,
+    0.63vw 1.25vw 0 currentColor,
+    1.25vw 1.25vw 0 currentColor,
+    1.88vw 1.25vw 0 currentColor,
     /* Row 3: 3 blocks */
-    12px 36px 0 currentColor,
-    24px 36px 0 currentColor,
-    36px 36px 0 currentColor,
+    0.63vw 1.88vw 0 currentColor,
+    1.25vw 1.88vw 0 currentColor,
+    1.88vw 1.88vw 0 currentColor,
     /* Row 4: 1 block (tip) */
-    24px 48px 0 currentColor;
+    1.25vw 2.5vw 0 currentColor;
 }
 
 .flag-1 { color: #FF6B6B; }
@@ -736,9 +729,9 @@ defineExpose({
 /* === 角色吉祥物 === */
 .mascot {
   position: absolute;
-  bottom: 40px;
-  width: 240px;
-  height: 260px;
+  bottom: 2.08vw;
+  width: 12.5vw;
+  height: 13.54vw;
   z-index: 2;
   pointer-events: none;
   image-rendering: pixelated;
@@ -758,50 +751,50 @@ defineExpose({
   bottom: 0;
   left: 0;
   right: 0;
-  height: 40px;
+  height: 2.08vw;
   background: #5cb85c;
-  border-top: 4px solid #4a9e4a;
-  box-shadow: inset 0 4px 0 0 #6ec96e;
+  border-top: 0.21vw solid #4a9e4a;
+  box-shadow: inset 0 0.21vw 0 0 #6ec96e;
   z-index: 1;
 }
 
 /* === 標題 === */
 .lobby-header {
-  margin-bottom: 16px;
+  margin-bottom: 0.83vw;
   text-align: center;
   z-index: 2;
 }
 
 .lobby-title {
-  font-size: 40px;
+  font-size: 2.08vw;
   color: white;
   text-shadow:
-    3px 3px 0 #e94560,
-    -1px -1px 0 #e94560,
-    1px -1px 0 #e94560,
-    -1px 1px 0 #e94560;
+    0.16vw 0.16vw 0 #e94560,
+    -0.05vw -0.05vw 0 #e94560,
+    0.05vw -0.05vw 0 #e94560,
+    -0.05vw 0.05vw 0 #e94560;
   animation: titleBounce 3s ease-in-out infinite;
 }
 
 .lobby-subtitle {
-  font-size: 20px;
+  font-size: 1.04vw;
   color: #ff6b6b;
-  margin-top: 8px;
-  letter-spacing: 6px;
-  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15);
+  margin-top: 0.42vw;
+  letter-spacing: 0.31vw;
+  text-shadow: 0.1vw 0.1vw 0 rgba(0, 0, 0, 0.15);
 }
 
 @keyframes titleBounce {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  50% { transform: translateY(-0.21vw); }
 }
 
 /* === 選擇提示 === */
 .lobby-hint {
-  font-size: 18px;
+  font-size: 0.94vw;
   color: #1a5276;
-  margin-bottom: 28px;
-  letter-spacing: 4px;
+  margin-bottom: 1.46vw;
+  letter-spacing: 0.21vw;
   animation: hintBlink 2s ease-in-out infinite;
   z-index: 2;
 }
@@ -815,14 +808,14 @@ defineExpose({
 .carousel-viewport {
   width: 100%;
   overflow: hidden;
-  padding: 24px 0;
+  padding: 1.25vw 0;
   position: relative;
   z-index: 2;
 }
 
 .carousel-track {
   display: flex;
-  gap: 30px;
+  gap: 1.56vw;
   align-items: center;
   transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   will-change: transform;
@@ -833,11 +826,11 @@ defineExpose({
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 42px;
+  font-size: 2.19vw;
   color: white;
   cursor: pointer;
   z-index: 10;
-  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
+  text-shadow: 0.16vw 0.16vw 0 rgba(0, 0, 0, 0.2);
   transition: opacity 0.2s, transform 0.15s;
   user-select: none;
 }
@@ -850,8 +843,8 @@ defineExpose({
   transform: translateY(-50%) scale(0.9);
 }
 
-.arrow-left { left: 24px; }
-.arrow-right { right: 24px; }
+.arrow-left { left: 1.25vw; }
+.arrow-right { right: 1.25vw; }
 
 .arrow.hidden {
   opacity: 0;
@@ -861,79 +854,79 @@ defineExpose({
 /* === 資訊面板 === */
 .info-panel {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 1.04vw;
   animation: infoFadeIn 0.3s ease-out;
   z-index: 2;
 }
 
 @keyframes infoFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(0.42vw); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .info-name {
-  font-size: 28px;
+  font-size: 1.46vw;
   color: white;
-  margin-bottom: 16px;
-  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.15);
+  margin-bottom: 0.83vw;
+  text-shadow: 0.16vw 0.16vw 0 rgba(0, 0, 0, 0.15);
 }
 
 .info-desc {
-  font-size: 16px;
+  font-size: 0.83vw;
   color: #1a5276;
-  margin-bottom: 18px;
-  letter-spacing: 1px;
+  margin-bottom: 0.94vw;
+  letter-spacing: 0.05vw;
 }
 
 .info-type {
-  margin-bottom: 24px;
+  margin-bottom: 1.25vw;
 }
 
 .type-badge {
-  font-size: 14px;
+  font-size: 0.73vw;
   color: white;
   background: #1a5276;
-  border: 3px solid #0d3b5e;
-  padding: 6px 20px;
-  letter-spacing: 3px;
-  box-shadow: 0 3px 0 #0d3b5e;
+  border: 0.16vw solid #0d3b5e;
+  padding: 0.31vw 1.04vw;
+  letter-spacing: 0.16vw;
+  box-shadow: 0 0.16vw 0 #0d3b5e;
 }
 
 /* === PLAY 按鈕 === */
 .play-btn {
   font-family: 'Press Start 2P', cursive;
-  font-size: 22px;
+  font-size: 1.15vw;
   color: white;
   background: #4caf50;
-  border: 5px solid #388e3c;
-  padding: 16px 48px;
+  border: 0.26vw solid #388e3c;
+  padding: 0.83vw 2.5vw;
   cursor: pointer;
-  letter-spacing: 3px;
-  box-shadow: 0 6px 0 #2e7d32;
+  letter-spacing: 0.16vw;
+  box-shadow: 0 0.31vw 0 #2e7d32;
   transition: transform 0.1s;
   animation: playBounce 1.5s ease-in-out infinite;
 }
 
 .play-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 0 #2e7d32;
+  transform: translateY(-0.1vw);
+  box-shadow: 0 0.42vw 0 #2e7d32;
 }
 
 .play-btn:active {
-  transform: translateY(3px);
-  box-shadow: 0 3px 0 #2e7d32;
+  transform: translateY(0.16vw);
+  box-shadow: 0 0.16vw 0 #2e7d32;
 }
 
 @keyframes playBounce {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  50% { transform: translateY(-0.16vw); }
 }
 
 /* === COMING SOON === */
 .coming-soon {
-  font-size: 18px;
+  font-size: 0.94vw;
   color: #0e1a24;
-  letter-spacing: 3px;
-  padding: 12px 0;
+  letter-spacing: 0.16vw;
+  padding: 0.63vw 0;
 }
 </style>

@@ -38,16 +38,16 @@ const cardStyle = computed(() => {
       backgroundColor: color,
       borderColor: darkenColor(color),
       boxShadow: props.selected
-        ? `0 8px 0 ${darkenColor(color)}, 0 12px 24px rgba(0,0,0,0.3)`
-        : `0 6px 0 ${darkenColor(color)}`,
+        ? `0 0.42vw 0 ${darkenColor(color)}, 0 0.63vw 1.25vw rgba(0,0,0,0.3)`
+        : `0 0.31vw 0 ${darkenColor(color)}`,
     }
   }
   return {
     backgroundColor: '#aaa',
     borderColor: '#888',
     boxShadow: props.selected
-      ? '0 8px 0 #888, 0 12px 24px rgba(0,0,0,0.2)'
-      : '0 6px 0 #888',
+      ? '0 0.42vw 0 #888, 0 0.63vw 1.25vw rgba(0,0,0,0.2)'
+      : '0 0.31vw 0 #888',
   }
 })
 
@@ -66,12 +66,12 @@ function handleClick() {
 
 <style scoped>
 .game-card {
-  width: 280px;
-  padding: 30px 20px 24px;
+  width: 14.58vw;
+  padding: 1.56vw 1.04vw 1.25vw;
   text-align: center;
   flex-shrink: 0;
   cursor: pointer;
-  border: 4px solid;
+  border: 0.21vw solid;
   position: relative;
 
   /* 像素風：無圓角 */
@@ -90,7 +90,7 @@ function handleClick() {
 
 /* === 選中 === */
 .game-card.selected {
-  transform: scale(1.12) translateY(-8px);
+  transform: scale(1.12) translateY(-0.42vw);
   opacity: 1;
   z-index: 2;
   animation: selectedBounce 2s ease-in-out infinite;
@@ -117,41 +117,41 @@ function handleClick() {
 /* === 選中彈跳動畫 === */
 @keyframes selectedBounce {
   0%, 100% {
-    transform: scale(1.12) translateY(-8px);
+    transform: scale(1.12) translateY(-0.42vw);
   }
   50% {
-    transform: scale(1.12) translateY(-14px);
+    transform: scale(1.12) translateY(-0.73vw);
   }
 }
 
 /* === 圖示 === */
 .game-card-icon {
-  width: 90px;
-  height: 90px;
-  margin: 0 auto 16px;
+  width: 4.69vw;
+  height: 4.69vw;
+  margin: 0 auto 0.83vw;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 36px;
+  font-size: 1.88vw;
   font-weight: bold;
   color: white;
   background: rgba(0, 0, 0, 0.2);
-  border: 4px solid rgba(0, 0, 0, 0.15);
+  border: 0.21vw solid rgba(0, 0, 0, 0.15);
 }
 
 .game-card-name {
-  font-size: 18px;
+  font-size: 0.94vw;
   color: white;
-  margin-bottom: 10px;
+  margin-bottom: 0.52vw;
   line-height: 1.4;
-  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+  text-shadow: 0.1vw 0.1vw 0 rgba(0, 0, 0, 0.3);
 }
 
 .game-card-type {
-  font-size: 12px;
+  font-size: 0.63vw;
   color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
-  letter-spacing: 3px;
+  letter-spacing: 0.16vw;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.2);
 }
 </style>

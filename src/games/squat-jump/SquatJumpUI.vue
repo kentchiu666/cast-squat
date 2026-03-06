@@ -100,65 +100,65 @@ function getColor(colorIndex: number): string {
 .squat-start-screen {
   width: 100%;
   text-align: center;
-  padding-top: 60px;
+  padding-top: 3.13vw;
 }
 
 .squat-title {
-  font-size: 48px;
+  font-size: 2.5vw;
   color: white;
   font-family: 'Press Start 2P', cursive;
 }
 
 .squat-player-count {
-  font-size: 20px;
+  font-size: 1.04vw;
   color: #888;
-  margin-top: 20px;
+  margin-top: 1.04vw;
   font-family: 'Press Start 2P', cursive;
 }
 
 .squat-player-list {
-  margin-top: 30px;
+  margin-top: 1.56vw;
 }
 
 .squat-player-entry {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 15px;
-  margin: 15px 0;
+  gap: 0.78vw;
+  margin: 0.78vw 0;
 }
 
 .squat-player-color-box {
-  width: 30px;
-  height: 30px;
+  width: 1.56vw;
+  height: 1.56vw;
   flex-shrink: 0;
 }
 
 .squat-player-name-text {
-  font-size: 16px;
+  font-size: 0.83vw;
   font-family: 'Press Start 2P', cursive;
 }
 
 .squat-waiting-msg {
-  margin-top: 40px;
-  font-size: 18px;
+  margin-top: 2.08vw;
+  font-size: 0.94vw;
   color: #888;
   line-height: 2;
   font-family: 'Press Start 2P', cursive;
 }
 
 .squat-sub {
-  font-size: 14px;
+  font-size: 0.73vw;
   display: block;
-  margin-top: 10px;
+  margin-top: 0.52vw;
 }
 
 .squat-start-hint {
   position: absolute;
-  bottom: 120px;
+  bottom: 6.25vw;
   width: 100%;
   text-align: center;
-  font-size: 18px;
+  font-size: 0.94vw;
   color: #95E86B;
   font-family: 'Press Start 2P', cursive;
 }
@@ -169,7 +169,7 @@ function getColor(colorIndex: number): string {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 120px;
+  font-size: 6.25vw;
   font-family: 'Press Start 2P', cursive;
   z-index: 10;
 }
@@ -189,7 +189,7 @@ function getColor(colorIndex: number): string {
 /* 多人分數 */
 .squat-score-bar {
   position: absolute;
-  top: 10px;
+  top: 0.52vw;
   left: 0;
   width: 100%;
   text-align: center;
@@ -198,47 +198,47 @@ function getColor(colorIndex: number): string {
 
 .squat-score-entry {
   display: inline-block;
-  margin: 0 20px;
+  margin: 0 1.04vw;
   text-align: center;
 }
 
 .squat-sname {
-  font-size: 14px;
+  font-size: 0.73vw;
 }
 
 .squat-svalue {
-  font-size: 14px;
+  font-size: 0.73vw;
   color: white;
-  margin-top: 5px;
+  margin-top: 0.26vw;
 }
 
 /* 單人 UI */
 .squat-ui {
   position: absolute;
-  top: 20px;
-  left: 20px;
+  top: 1.04vw;
+  left: 1.04vw;
   color: white;
-  font-size: 24px;
+  font-size: 1.25vw;
   font-family: 'Press Start 2P', cursive;
 }
 
 .squat-timer-ui {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 1.04vw;
+  right: 1.04vw;
   color: white;
-  font-size: 24px;
+  font-size: 1.25vw;
   font-family: 'Press Start 2P', cursive;
 }
 
 /* 操作按鈕 */
 .squat-action-btn {
   position: absolute;
-  bottom: 40px;
+  bottom: 2.08vw;
   left: 50%;
   transform: translateX(-50%);
-  padding: 20px 40px;
-  font-size: 24px;
+  padding: 1.04vw 2.08vw;
+  font-size: 1.25vw;
   font-family: 'Press Start 2P', cursive;
   background-color: #e94560;
   color: white;
@@ -261,17 +261,17 @@ function getColor(colorIndex: number): string {
 .squat-game-over-screen {
   width: 100%;
   text-align: center;
-  padding-top: 60px;
+  padding-top: 3.13vw;
 }
 
 .squat-game-over-content {
-  margin-top: 40px;
+  margin-top: 2.08vw;
 }
 
 .squat-leaderboard-title {
-  font-size: 24px;
+  font-size: 1.25vw;
   color: white;
-  margin-bottom: 30px;
+  margin-bottom: 1.56vw;
   font-family: 'Press Start 2P', cursive;
 }
 
@@ -279,39 +279,39 @@ function getColor(colorIndex: number): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 15px;
-  margin: 15px 0;
-  font-size: 18px;
+  gap: 0.78vw;
+  margin: 0.78vw 0;
+  font-size: 0.94vw;
   font-family: 'Press Start 2P', cursive;
 }
 
 .squat-rank-medal {
-  width: 70px;
+  width: 3.65vw;
   text-align: right;
 }
 
 .squat-lb-name {
-  width: 150px;
+  width: 7.81vw;
   text-align: left;
 }
 
 .squat-lb-score {
-  width: 60px;
+  width: 3.13vw;
   text-align: right;
   color: white;
 }
 
 .squat-single-result {
-  font-size: 32px;
+  font-size: 1.67vw;
   color: white;
-  margin-top: 60px;
+  margin-top: 3.13vw;
   font-family: 'Press Start 2P', cursive;
 }
 
 .squat-single-detail {
-  font-size: 18px;
+  font-size: 0.94vw;
   color: white;
-  margin-top: 30px;
+  margin-top: 1.56vw;
   font-family: 'Press Start 2P', cursive;
 }
 </style>

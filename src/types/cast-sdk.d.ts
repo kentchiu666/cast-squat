@@ -7,6 +7,11 @@ declare namespace cast {
       senderId: string
     }
 
+    interface CastReceiverOptions {
+      disableIdleTimeout?: boolean
+      skipPlayersLoad?: boolean
+    }
+
     class CastReceiverContext {
       static getInstance(): CastReceiverContext
       addCustomMessageListener(
@@ -18,7 +23,7 @@ declare namespace cast {
         senderId: string | undefined,
         data: unknown,
       ): void
-      start(): void
+      start(options?: CastReceiverOptions): void
       stop(): void
     }
   }

@@ -17,6 +17,7 @@ This file provides guidance to Claude Code when working with this repository.
 - **遊戲模組系統**：GameModule 介面統一管理，支援動態載入（code-splitting）
 - **深蹲跳躍遊戲**：20 秒計時 / 7 階段跳躍動畫 / 金幣收集 / 多人模式（最多 4 人）
 - **搖搖樂遊戲**：盲玩模式 / sin 曲線搖晃動畫 / RESULT_PENDING 結果收集 / 多人模式（最多 8 人）
+- **虛擬跑步遊戲（Demo）**：YouTube 影片背景 / 手機加速度計計步 / 距離累積 / 單人模式
 - **多人等候室**：START_SCREEN 顯示已加入玩家（角色預覽 + 名稱）
 - **排行榜**：遊戲結束顯示玩家排名
 - 支援本地瀏覽器測試與 Google Cast 部署
@@ -52,14 +53,19 @@ cast-squat/
 │       │   ├── particles.ts            # 粒子系統
 │       │   ├── effects.ts              # 殘影、速度線、螢幕震動
 │       │   └── players.ts              # 多人玩家管理
-│       └── shake-it/                   # 搖搖樂遊戲模組
-│           ├── index.ts                # GameModule 實作（盲玩 + 結果收集）
+│       ├── shake-it/                   # 搖搖樂遊戲模組
+│       │   ├── index.ts                # GameModule 實作（盲玩 + 結果收集）
+│       │   ├── ui-state.ts             # Vue reactive 狀態物件
+│       │   ├── ShakeItUI.vue           # 遊戲 UI 元件（Vue 管理）
+│       │   ├── constants.ts            # 遊戲常數、派對背景配置
+│       │   ├── character.ts            # 搖晃角色繪製、彩色精靈圖
+│       │   ├── effects.ts              # 螢幕震動
+│       │   └── players.ts              # 多人玩家管理（8 人、結果提交）
+│       └── virtual-run/                # 虛擬跑步遊戲模組（Demo）
+│           ├── index.ts                # GameModule 實作（YouTube + 距離累積）
 │           ├── ui-state.ts             # Vue reactive 狀態物件
-│           ├── ShakeItUI.vue           # 遊戲 UI 元件（Vue 管理）
-│           ├── constants.ts            # 遊戲常數、派對背景配置
-│           ├── character.ts            # 搖晃角色繪製、彩色精靈圖
-│           ├── effects.ts              # 螢幕震動
-│           └── players.ts              # 多人玩家管理（8 人、結果提交）
+│           ├── VirtualRunUI.vue        # 遊戲 UI 元件（YouTube iframe + 距離 bar）
+│           └── constants.ts            # 遊戲常數（影片 ID、步幅）
 ├── kenney_shape-characters/            # Kenney 免費角色素材包
 │   └── Spritesheet/
 │       ├── spritesheet_default.png
@@ -192,12 +198,24 @@ gameLoop(timestamp)
 | `effects.ts` | 螢幕震動 |
 | `players.ts` | 多人玩家管理（最多 8 人）、結果提交、排行榜 |
 
+#### Virtual Run 遊戲模組（Demo）
+
+| 模組 | 職責 |
+|------|------|
+| `index.ts` | GameModule 實作、狀態機、距離累積 |
+| `ui-state.ts` | Vue reactive 狀態物件（距離、時間、影片控制） |
+| `VirtualRunUI.vue` | YouTube IFrame API 播放器 + 底部距離 bar |
+| `constants.ts` | 影片 ID、步幅常數 |
+
+> **特殊性**：此遊戲不使用 Canvas 繪製（`render()` 為空操作），影片由 YouTube iframe 渲染，UI 由 Vue DOM 管理。
+
 ### Cast Integration
 - **Application ID**: `DD35BB50`
 - **Namespace**: `urn:x-cast:com.example.castsquat`
 - **Receiver URL**: `https://kentchiu666.github.io/cast-squat/`
 - **Cast SDK 型別宣告**：`src/types/cast-sdk.d.ts`（最小 `.d.ts`，僅宣告用到的 API）
 - **初始化**：App.vue `onMounted` → `initCastReceiver()`，無 Cast SDK 時自動降級為本地測試模式
+- **啟動選項**：`disableIdleTimeout: true`（非媒體 App 停用 5 分鐘 idle 自動關閉）、`skipPlayersLoad: true`（不載入內建播放器 JS）
 - **平台級訊息**（App.vue `handleCastMessage` 處理）：
   - 載入遊戲：`{ action: 'LOAD_GAME', gameId: 'squat_jump' }`
   - 返回大廳：`{ action: 'RETURN_LOBBY' }`
@@ -210,6 +228,7 @@ gameLoop(timestamp)
   - 搖晃：`{ action: 'SHAKE', playerId: 'xxx' }`
   - 開始/重新開始：`{ action: 'START_GAME' }`
   - 提交結果：`{ action: 'GAME_RESULT', playerId, score, details }`
+  - 跑步更新：`{ action: 'RUN_UPDATE', playerId, steps, distance }`
 - **Receiver → Sender 廣播**：
   - `{ type: 'PLATFORM_STATE', state: 'LOBBY' | 'GAME_ACTIVE', gameId?, gameState? }`
   - `{ type: 'LOBBY_STATE', games: GameInfoSlim[], selectedIndex: number }`
@@ -237,6 +256,21 @@ gameLoop(timestamp)
 6. **Canvas 半解析度** — `CANVAS_SCALE = 0.5`，用 CSS 放大到全螢幕
 
 ## Development Guidelines
+
+### 響應式佈局規範（AI 必讀）
+Cast 應用永遠全螢幕橫向顯示，以 **1920px 為基準寬度**，所有尺寸使用 **vw 單位**。
+
+#### CSS 規則
+- **禁止硬編碼 px**（除 `max(1px, ...)` 保底極細邊框外）
+- 換算公式：`vw = px / 1920 * 100`（常用：16px→0.83vw、24px→1.25vw、48px→2.5vw）
+- 行內 style 的 fontSize 也必須用 vw（如倒數動畫 `'6.25vw'`）
+- box-shadow 像素藝術裝飾也用 vw 單位
+
+#### Canvas 參考座標系統
+- `REFERENCE_WIDTH = 1920`、`REFERENCE_HEIGHT = 1080`
+- 遊戲模組的 `logicalWidth`/`logicalHeight` 固定為參考值，**不需要 resize listener**
+- `App.vue` 的 `ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0)` 處理實際解析度縮放
+- 所有繪製程式碼永遠在 1920×1080 虛擬座標中運作
 
 ### Pixel Art Conventions
 1. **Canvas 設定**: `ctx.imageSmoothingEnabled = false`
