@@ -12,6 +12,11 @@ let tickCounter = 0
 let _broadcastFn: BroadcastFn | null = null
 let _returnToLobbyFn: (() => void) | null = null
 
+// === Idle detection（停止搖晃暫停影片）===
+let totalTicks = 0
+let lastRunUpdateTick = 0
+let isRunning = false
+
 // === 狀態切換 ===
 function changeState(newState: GameState): void {
   gameState = newState
@@ -40,6 +45,9 @@ function startGame(): void {
   steps = 0
   elapsedSeconds = 0
   tickCounter = 0
+  totalTicks = 0
+  lastRunUpdateTick = 0
+  isRunning = true
 
   uiState.distance = 0
   uiState.steps = 0
@@ -94,6 +102,12 @@ function handleAction(): void {
       steps += Math.round(RUN_CONFIG.LOCAL_TEST_DISTANCE_PER_CLICK / DEFAULT_STRIDE_LENGTH)
       uiState.distance = distance
       uiState.steps = steps
+      // 同步更新 idle detection（本地點擊等同收到 RUN_UPDATE）
+      lastRunUpdateTick = totalTicks
+      if (!isRunning) {
+        isRunning = true
+        uiState.videoCommand = 'play'
+      }
       break
     case 'GAME_OVER':
       uiState.videoCommand = 'stop'
@@ -113,6 +127,12 @@ function handleStructuredMessage(data: CastMessageData, _senderId?: string): voi
         steps = data.steps
         uiState.distance = distance
         uiState.steps = steps
+        // 更新 idle detection，恢復播放
+        lastRunUpdateTick = totalTicks
+        if (!isRunning) {
+          isRunning = true
+          uiState.videoCommand = 'play'
+        }
       }
       break
     case 'START_GAME':
@@ -158,6 +178,9 @@ const VirtualRunGame: GameModule = {
     steps = 0
     elapsedSeconds = 0
     tickCounter = 0
+    totalTicks = 0
+    lastRunUpdateTick = 0
+    isRunning = false
     _broadcastFn = null
     _returnToLobbyFn = null
   },
@@ -184,11 +207,18 @@ const VirtualRunGame: GameModule = {
 
   tick() {
     if (gameState === 'PLAYING') {
+      totalTicks++
       tickCounter++
       if (tickCounter >= RUN_CONFIG.TICKS_PER_SECOND) {
         tickCounter = 0
         elapsedSeconds++
         uiState.elapsedTime = elapsedSeconds
+      }
+
+      // Idle detection：超過 threshold 未收到 RUN_UPDATE → 暫停影片
+      if (isRunning && (totalTicks - lastRunUpdateTick) >= RUN_CONFIG.IDLE_TIMEOUT_TICKS) {
+        isRunning = false
+        uiState.videoCommand = 'pause'
       }
     }
   },
