@@ -1,4 +1,4 @@
-import type { GameModule, GameState, CastMessageData, BroadcastFn } from '../../types/game'
+import type { GameModule, GameState, CastMessageData, BroadcastFn, ReplyFn } from '../../types/game'
 import { uiState, resetUIState } from './ui-state'
 import { RUN_CONFIG, DEFAULT_STRIDE_LENGTH } from './constants'
 import VirtualRunUI from './VirtualRunUI.vue'
@@ -10,6 +10,7 @@ let steps = 0
 let elapsedSeconds = 0
 let tickCounter = 0
 let _broadcastFn: BroadcastFn | null = null
+let _replyFn: ReplyFn | null = null
 let _returnToLobbyFn: (() => void) | null = null
 
 // === Idle detection（停止搖晃暫停影片）===
@@ -116,11 +117,22 @@ function handleAction(): void {
   }
 }
 
+function replyTo(senderId: string | undefined, msg: Record<string, unknown>): void {
+  if (_replyFn && senderId) {
+    _replyFn(senderId, msg)
+  }
+}
+
 // === Cast 訊息處理 ===
-function handleStructuredMessage(data: CastMessageData, _senderId?: string): void {
+function handleStructuredMessage(data: CastMessageData, senderId?: string): void {
   if (typeof data === 'string') return
 
   switch (data.action) {
+    case 'PLAYER_JOIN':
+      // 單人遊戲，直接接受加入
+      replyTo(senderId, { type: 'JOIN_RESULT', success: true })
+      replyTo(senderId, { type: 'STATE_UPDATE', state: gameState })
+      break
     case 'RUN_UPDATE':
       if (gameState === 'PLAYING' && 'distance' in data) {
         distance = data.distance
@@ -182,6 +194,7 @@ const VirtualRunGame: GameModule = {
     lastRunUpdateTick = 0
     isRunning = false
     _broadcastFn = null
+    _replyFn = null
     _returnToLobbyFn = null
   },
 
@@ -197,8 +210,9 @@ const VirtualRunGame: GameModule = {
     return VirtualRunUI
   },
 
-  setBroadcastCallbacks(broadcastFn, _replyFn) {
+  setBroadcastCallbacks(broadcastFn, replyFn) {
     _broadcastFn = broadcastFn
+    _replyFn = replyFn
   },
 
   setReturnToLobbyCallback(fn: () => void) {
