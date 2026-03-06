@@ -39,6 +39,7 @@ function createPlayer(): void {
     events: {
       onReady: () => {
         state.videoReady = true
+        executeVideoCommand()
       },
       onStateChange: (event: { data: number }) => {
         // YT.PlayerState.ENDED = 0
@@ -53,25 +54,28 @@ function createPlayer(): void {
   })
 }
 
+// 執行待處理的 videoCommand（共用邏輯）
+function executeVideoCommand(): void {
+  const cmd = state.videoCommand
+  if (!player || !cmd) return
+  switch (cmd) {
+    case 'play':
+      player.playVideo()
+      break
+    case 'pause':
+      player.pauseVideo()
+      break
+    case 'stop':
+      player.stopVideo()
+      break
+  }
+  state.videoCommand = null
+}
+
 // 監聽 videoCommand 控制播放
-watch(
-  () => state.videoCommand,
-  (cmd) => {
-    if (!player || !cmd) return
-    switch (cmd) {
-      case 'play':
-        player.playVideo()
-        break
-      case 'pause':
-        player.pauseVideo()
-        break
-      case 'stop':
-        player.stopVideo()
-        break
-    }
-    state.videoCommand = null
-  },
-)
+watch(() => state.videoCommand, () => {
+  executeVideoCommand()
+})
 
 // === Computed ===
 const formattedDistance = computed(() => {
@@ -149,6 +153,10 @@ interface YTNamespace {
       class="run-youtube-container"
     >
       <div id="run-youtube-player"></div>
+      <!-- Loading 提示（player 尚未 ready） -->
+      <div v-if="state.gameState === 'PLAYING' && !state.videoReady" class="run-loading">
+        LOADING VIDEO...
+      </div>
     </div>
 
     <!-- 底部距離 bar -->
@@ -232,6 +240,21 @@ interface YTNamespace {
   width: 100%;
   height: 100%;
   z-index: 0;
+}
+
+.run-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.25vw;
+  color: #888;
+  animation: shakePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes shakePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .run-youtube-container :deep(iframe) {
