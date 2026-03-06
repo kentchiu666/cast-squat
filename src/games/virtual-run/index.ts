@@ -47,7 +47,7 @@ function startGame(): void {
   tickCounter = 0
   totalTicks = 0
   lastRunUpdateTick = 0
-  isRunning = true
+  isRunning = false
 
   uiState.distance = 0
   uiState.steps = 0
