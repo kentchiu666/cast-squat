@@ -126,6 +126,7 @@ function replyTo(senderId: string | undefined, msg: Record<string, unknown>): vo
 // === Cast 訊息處理 ===
 function handleStructuredMessage(data: CastMessageData, senderId?: string): void {
   if (typeof data === 'string') return
+  console.log('[VirtualRun] message:', data.action, data)
 
   switch (data.action) {
     case 'PLAYER_JOIN':
@@ -222,11 +223,15 @@ const VirtualRunGame: GameModule = {
   tick() {
     if (gameState === 'PLAYING') {
       totalTicks++
-      tickCounter++
-      if (tickCounter >= RUN_CONFIG.TICKS_PER_SECOND) {
-        tickCounter = 0
-        elapsedSeconds++
-        uiState.elapsedTime = elapsedSeconds
+
+      // 只在跑步中才累計時間
+      if (isRunning) {
+        tickCounter++
+        if (tickCounter >= RUN_CONFIG.TICKS_PER_SECOND) {
+          tickCounter = 0
+          elapsedSeconds++
+          uiState.elapsedTime = elapsedSeconds
+        }
       }
 
       // Idle detection：超過 threshold 未收到 RUN_UPDATE → 暫停影片
