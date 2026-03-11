@@ -239,9 +239,11 @@ function selectGame() {
 ```
 App.vue（根元件 — Canvas + 遊戲迴圈 + 平台狀態管理）
 ├── LobbyScreen.vue（LOBBY 大廳 — 像素藝術裝飾 + 遊戲列表）
-│   └── GameCard.vue × 9（遊戲卡片）
-└── #textLayer（遊戲 DOM UI 注入點）
-    └── 遊戲模組的 DOM 元素（由 dom-ui.ts 動態建立）
+│   └── GameCard.vue × N（遊戲卡片）
+└── <component :is="activeGameUI" />（動態掛載遊戲 Vue UI）
+    ├── SquatJumpUI.vue（深蹲跳躍 UI）
+    ├── ShakeItUI.vue（搖搖樂 UI）
+    └── VirtualRunUI.vue（虛擬跑步 UI）
 ```
 
 **響應式資料 (Reactivity)**
@@ -259,28 +261,52 @@ platformState.value = 'GAME_ACTIVE'
 **單檔元件 (Single File Component, .vue)**
 一個 `.vue` 檔案包含 HTML模板 + TypeScript邏輯 + CSS樣式，三合一。
 
-### Vue 只管 LOBBY，不管遊戲內部
+### Vue 管 LOBBY，也管遊戲 UI
 
-重要的架構決策：**遊戲模組內部的 DOM 元素不用 Vue，而是用原生 DOM 操作**。
+重要的架構決策：**LOBBY 和遊戲內部的文字 UI 都用 Vue 元件管理**。
 
-原因：
-- 遊戲 UI（分數、倒數、按鈕）需要極低延遲更新
-- 遊戲模組是獨立的 TypeScript 模組，不依賴 Vue
-- DOM 更新使用快取比對，值不變時不寫入（效能優化）
+每個遊戲模組包含三個 UI 相關檔案：
+
+```
+src/games/squat-jump/
+├── ui-state.ts       ← reactive() 狀態物件（遊戲邏輯更新這裡）
+├── SquatJumpUI.vue   ← Vue 元件（綁定 reactive state 自動渲染）
+└── index.ts          ← getUIComponent() 回傳 Vue 元件
+```
+
+**遊戲邏輯** 只負責更新 reactive state，**Vue 自動**處理畫面更新：
 
 ```typescript
-// src/games/squat-jump/dom-ui.ts — 遊戲內部 DOM（不用 Vue）
-export function createGameDOM(container: HTMLElement, onAction: () => void): void {
-  const startScreen = document.createElement('div')
-  startScreen.className = 'squat-start-screen'
-  // ...
-  container.appendChild(startScreen)
-}
+// ui-state.ts — 用 Vue reactive 包裝遊戲 UI 狀態
+import { reactive } from 'vue'
 
-export function destroyGameDOM(): void {
-  // 清除所有遊戲 DOM 元素和動態 <style>
-}
+export const uiState = reactive({
+  gameState: 'START_SCREEN',
+  timer: 0,
+  finalScore: 0,
+  actionButtonText: 'LOADING...',
+  onAction: null,  // 操作按鈕回調
+})
 ```
+
+```vue
+<!-- SquatJumpUI.vue — 綁定 reactive state，自動更新 -->
+<template>
+  <div v-if="uiState.gameState === 'PLAYING'" class="squat-timer">
+    {{ uiState.timer }}
+  </div>
+  <button @click="uiState.onAction?.()">
+    {{ uiState.actionButtonText }}
+  </button>
+</template>
+
+<style scoped>
+/* CSS 只影響這個遊戲元件，不會跟其他遊戲衝突 */
+.squat-timer { font-family: 'Press Start 2P'; }
+</style>
+```
+
+App.vue 透過 `<component :is="activeGameUI" />` 動態掛載遊戲 UI 元件。遊戲結束返回 LOBBY 時設定 `activeGameUI = null`，Vue 自動卸載並清除 DOM。
 
 ---
 
@@ -339,24 +365,26 @@ ctx.imageSmoothingEnabled = false
 │   ┌──────────────────────────────────┐   │
 │   │  Canvas 層（底層 — 遊戲繪圖）      │   │
 │   │  - 星空背景（App.vue 擁有）        │   │
-│   │  - 角色精靈、跳躍動畫              │   │
+│   │  - 角色精靈、跳躍/搖晃動畫         │   │
 │   │  - 金幣、粒子效果                  │   │
-│   │  - 殘影、速度線                    │   │
+│   │  - 殘影、速度線、派對光點           │   │
 │   │  - 地板                            │   │
-│   │  TypeScript 模組，不依賴 Vue       │   │
+│   │  TypeScript 模組 render() 繪製     │   │
 │   └──────────────────────────────────┘   │
 │                                          │
 │   ┌──────────────────────────────────┐   │
-│   │  DOM 層（上層 — #textLayer）       │   │
+│   │  Vue 層（上層 — UI overlay）       │   │
 │   │                                    │   │
-│   │  Vue 元件：                        │   │
+│   │  平台 Vue 元件：                   │   │
 │   │  - LobbyScreen（大廳 + 遊戲卡片）  │   │
 │   │                                    │   │
-│   │  遊戲 DOM（原生 DOM，非 Vue）：      │   │
+│   │  遊戲 Vue 元件（動態掛載）：        │   │
+│   │  - SquatJumpUI / ShakeItUI / ...  │   │
 │   │  - 分數/計時器 UI                  │   │
 │   │  - 倒數動畫 (3-2-1-GO!)           │   │
+│   │  - 等候室（多人玩家列表）           │   │
 │   │  - 排行榜/結算畫面                 │   │
-│   │  - JUMP!/START/RESTART 按鈕       │   │
+│   │  - JUMP!/SHAKE!/START 按鈕        │   │
 │   └──────────────────────────────────┘   │
 │                                          │
 └─────────────────────────────────────────┘
@@ -364,9 +392,8 @@ ctx.imageSmoothingEnabled = false
 
 **簡單說：**
 - **Canvas** 管遊戲圖形（精靈、粒子、物理運算）
-- **Vue** 管 LOBBY 大廳 UI
-- **原生 DOM** 管遊戲內文字 UI（效能考量）
-- 三者疊在一起，透過 `pointer-events` 控制互動
+- **Vue** 管所有文字 UI（LOBBY 大廳 + 遊戲內 UI）
+- 兩者疊在一起，透過 `pointer-events` 控制互動
 
 ### 資料流向
 
@@ -377,12 +404,14 @@ App.vue（平台主控）
 ├── LOBBY 狀態 → 顯示 LobbyScreen.vue
 │   └── 使用者點擊 PLAY → handleGameSelect()
 │       ├── 動態 import 遊戲模組
-│       ├── activeGame.init(canvas, ctx, spritesheet, domContainer)
+│       ├── activeGame.init(canvas, ctx, characterSheets, itemSpritesheet)
+│       ├── activeGameUI = activeGame.getUIComponent()  ← 動態掛載 Vue UI
 │       └── platformState = 'GAME_ACTIVE'
 ├── GAME_ACTIVE 狀態 → 每幀呼叫：
-│   ├── activeGame.tick()    ← 物理更新（60 次/秒）
-│   └── activeGame.render()  ← 畫面繪製（每幀一次）
-└── 返回 LOBBY → activeGame.destroy() → platformState = 'LOBBY'
+│   ├── activeGame.tick()    ← 物理/邏輯更新（60 次/秒）
+│   ├── activeGame.render()  ← Canvas 繪製（每幀一次）
+│   └── Vue 自動更新遊戲 UI  ← reactive state 變化 → DOM 差異比對
+└── 返回 LOBBY → activeGame.destroy() → activeGameUI = null → Vue 自動卸載
 ```
 
 ---
@@ -426,7 +455,7 @@ npm (Node Package Manager) 是 JavaScript 生態系的**套件管理器**。類�
 ```bash
 npm install          # 安裝 package.json 裡列的所有套件 → node_modules/
 npm run dev          # 啟動 Vite 開發伺服器（localhost:5173）
-npm test             # 跑 Vitest 單元測試（74 個測試，< 0.2 秒）
+npm test             # 跑 Vitest 單元測試（103 個測試，< 0.2 秒）
 npm run build        # TypeScript 型別檢查 + Vite 打包 → dist/
 npm run preview      # 預覽 dist/ 的建置結果
 ```
@@ -448,7 +477,7 @@ Vitest 是一個**單元測試框架**，專為 Vite 生態系設計。它的 AP
   改了碰撞檢測 → 手動打開遊戲 → 跳幾下看有沒有撞到金幣 → 好像可以（但其實 edge case 壞了）
 
 有測試：
-  改了碰撞檢測 → npm test → 0.1 秒跑完 74 個測試 → 第 42 個失敗
+  改了碰撞檢測 → npm test → 0.1 秒跑完 103 個測試 → 第 42 個失敗
   → 立刻知道「兩個圓剛好碰到邊界」的情況壞了
 ```
 
@@ -500,10 +529,17 @@ src/games/squat-jump/
 ├── utils.ts              ← 被測程式碼
 ├── players.ts            ← 被測程式碼
 ├── character.ts          ← 被測程式碼
-└── __tests__/            ← 測試放這裡
+└── __tests__/
     ├── utils.test.ts     ← 26 個測試（緩動函數、碰撞檢測）
     ├── players.test.ts   ← 26 個測試（玩家管理、排行榜）
     └── character.test.ts ← 22 個測試（跳躍狀態機）
+
+src/games/shake-it/
+├── players.ts            ← 被測程式碼
+├── character.ts          ← 被測程式碼
+└── __tests__/
+    ├── players.test.ts   ← 8 人玩家管理、結果提交、排行榜
+    └── character.test.ts ← 搖晃動畫數學函數
 ```
 
 ### 什麼要測，什麼不測？
@@ -645,26 +681,32 @@ cast-squat/
 │   │   ├── LobbyScreen.vue  ← LOBBY 大廳
 │   │   └── GameCard.vue     ← 遊戲卡片
 │   └── games/
-│       └── squat-jump/      ← 遊戲模組（純 TypeScript）
-│           ├── index.ts     ← GameModule 介面實作
-│           ├── constants.ts ← 所有常數（跳躍、金幣、粒子、特效、動畫）
-│           ├── character.ts
-│           ├── coins.ts
-│           ├── particles.ts
-│           ├── effects.ts
-│           ├── players.ts
-│           ├── dom-ui.ts
-│           ├── utils.ts
-│           └── __tests__/   ← Vitest 單元測試
-│               ├── utils.test.ts
-│               ├── players.test.ts
-│               └── character.test.ts
+│       ├── shared/              ← 共用遊戲框架（Factory Pattern）
+│       │   ├── types.ts         ← GameContext、GameConfig 型別定義
+│       │   └── create-game-module.ts  ← 工廠函數（封裝共用邏輯）
+│       ├── squat-jump/          ← 深蹲跳躍遊戲模組
+│       │   ├── index.ts         ← 用 createGameModule() 建立
+│       │   ├── ui-state.ts      ← Vue reactive 狀態物件
+│       │   ├── SquatJumpUI.vue  ← 遊戲 UI 元件
+│       │   ├── constants.ts     ← 所有常數
+│       │   ├── character.ts / coins.ts / particles.ts / ...
+│       │   └── __tests__/       ← Vitest 單元測試
+│       ├── shake-it/            ← 搖搖樂遊戲模組
+│       │   ├── index.ts         ← 用 createGameModule() 建立
+│       │   ├── ui-state.ts      ← Vue reactive 狀態物件
+│       │   ├── ShakeItUI.vue    ← 遊戲 UI 元件
+│       │   └── ...
+│       └── virtual-run/         ← 虛擬跑步遊戲模組
+│           ├── index.ts         ← 用 createGameModule() 建立
+│           ├── ui-state.ts      ← Vue reactive 狀態物件
+│           ├── VirtualRunUI.vue ← 遊戲 UI 元件
+│           └── ...
 ├── dist/                ← npm run build 產出（部署用）
 └── node_modules/        ← 套件（不進 git）
 ```
 - 開發流程：改 .ts/.vue → Vite 自動熱更新
 - 部署流程：`npm run build` → 上傳 `dist/` 資料夾
-- 優勢：型別安全、元件化、code-splitting、LOBBY 遊戲大廳
+- 優勢：型別安全、元件化、code-splitting、Factory Pattern 減少重複
 
 ### 技術對照表
 
@@ -675,34 +717,84 @@ cast-squat/
 | 瀏覽器直接載入 | Vite 建置 | 支援 TS/Vue 編譯、打包壓縮、code-splitting |
 | `python3 -m http.server` | `npm run dev` | HMR 自動熱更新，不用手動刷新 |
 | 整個資料夾上傳 | `npm run build` → dist/ | 壓縮優化、Tree-shaking、按需載入 |
-| 單一遊戲 | 遊戲平台 + 模組系統 | 支援多個遊戲，LOBBY 選擇 |
+| 單一遊戲 | 遊戲平台 + Factory Pattern 模組系統 | 支援多個遊戲，共用邏輯不重複 |
 | 無測試 | Vitest 單元測試（74 個） | 改邏輯後秒知道有沒有壞掉 |
 | 魔術數字散落各處 | 統一 constants.ts 常數管理 | 調參集中、語義清楚 |
 | Canvas 遊戲繪圖 | Canvas 遊戲繪圖（不變） | 精靈/粒子繪製，框架幫不上忙 |
 
-### GameModule 模組系統
+### GameModule 模組系統 + Factory Pattern
 
-V2 的核心設計是 **GameModule 介面**，讓每個遊戲都是獨立的模組：
+V2 的核心設計是 **GameModule 介面** + **`createGameModule()` 工廠函數**。
+
+遊戲不再手動實作整個 GameModule 介面，而是透過工廠函數，只提供「差異部分」的 hooks：
 
 ```typescript
-// src/types/game.ts
+// src/types/game.ts — 平台定義的介面（由工廠函數產出）
 interface GameModule {
   id: string
   name: string
-  init(canvas, ctx, spritesheet, domContainer): void  // 初始化
-  start(): void    // 開始
-  stop(): void     // 暫停
-  destroy(): void  // 銷毀（清除所有狀態和 DOM）
-  tick(): void     // 物理更新（60 次/秒）
-  render(ctx): void // 畫面繪製（每幀一次）
-  handleMessage(data, senderId?): void  // Cast 訊息
+  init(canvas, ctx, characterSheets, itemSpritesheet): void
+  start(): void
+  stop(): void
+  destroy(): void     // 自動重置狀態 + 清除 UI
+  tick(): void         // 物理更新（60 次/秒）
+  render(ctx): void    // Canvas 繪製（每幀一次）
+  handleMessage(data, senderId?): void  // Cast 訊息路由
+  getUIComponent(): Component          // 回傳遊戲 Vue UI 元件
   // ...
 }
 ```
 
+```typescript
+// src/games/shared/create-game-module.ts — 工廠函數
+// 封裝了所有遊戲共用的邏輯：
+// - 狀態管理（gameState 切換 + 自動廣播 STATE_UPDATE）
+// - 倒數動畫（3-2-1-GO! + 計時器）
+// - 多人玩家加入/離開/鎖定
+// - Cast 訊息路由（PLAYER_JOIN、START_GAME、RETURN_LOBBY 等）
+// - destroy() 時自動重置所有狀態
+
+export function createGameModule<TState>(config: GameConfig<TState>): GameModule
+```
+
+```typescript
+// src/games/virtual-run/index.ts — 遊戲只需提供差異 hooks
+export default createGameModule<VirtualRunState>({
+  id: 'virtual_run',
+  name: 'Virtual Run',
+  uiComponent: VirtualRunUI,   // Vue UI 元件
+  createState,                  // 狀態工廠（取代散落的 let 變數）
+
+  buttonText: {
+    START_SCREEN: 'START RUN',
+    PLAYING: 'RUN +10m',
+    GAME_OVER: 'RUN AGAIN',
+  },
+
+  onAction(ctx) { /* 按鈕點擊處理 */ },
+  onMessage(ctx, data) { /* 遊戲專屬訊息（RUN_UPDATE） */ },
+  onTick(ctx) { /* 每 tick 的邏輯更新 */ },
+  onRender(ctx, canvasCtx) { /* Canvas 繪製 */ },
+})
+```
+
+**關鍵概念 — GameContext：**
+工廠函數提供一個 `GameContext<TState>` 物件給每個 hook，裡面包含：
+- `ctx.state` — 遊戲專屬狀態（型別安全）
+- `ctx.changeState('PLAYING')` — 切換狀態（自動廣播 + 更新按鈕文字）
+- `ctx.broadcast({...})` — 傳訊息給所有 Sender
+- `ctx.isMultiplayerMode()` — 是否有玩家加入
+- `ctx.stopGameTimer()` — 停止倒數計時器
+
+**好處：**
+- 新增遊戲只需寫「差異部分」，共用邏輯由工廠函數處理
+- `destroy()` 自動用 `state = createState()` 重置，不會漏掉新增的欄位
+- 100+ 行的訊息路由和倒數邏輯不用每個遊戲都寫一遍
+
 新增遊戲只需要：
 1. 在 `src/games/` 建立新目錄
-2. 實作 `GameModule` 介面
-3. 在 `game-registry.ts` 註冊
+2. 建立 `ui-state.ts`（reactive 狀態）、`GameUI.vue`（Vue 元件）
+3. 用 `createGameModule()` 建立模組，提供差異 hooks
+4. 在 `game-registry.ts` 註冊
 
-平台（App.vue）會自動處理載入、遊戲迴圈驅動、卸載。
+平台（App.vue）會自動處理載入、遊戲迴圈驅動、Vue UI 掛載/卸載。

@@ -42,8 +42,11 @@ cast-squat/
 │   │   ├── LobbyScreen.vue             # LOBBY 大廳畫面
 │   │   └── GameCard.vue                # 遊戲卡片元件
 │   └── games/
+│       ├── shared/                      # 遊戲模組共用基礎設施
+│       │   ├── create-game-module.ts   # GameModule 工廠函數（封裝共用生命週期、訊息路由、倒數）
+│       │   └── types.ts               # GameConfig、GameContext 型別定義
 │       ├── squat-jump/                 # 深蹲跳躍遊戲模組
-│       │   ├── index.ts                # GameModule 實作（狀態機 + 訊息處理）
+│       │   ├── index.ts                # 透過 createGameModule() 建立（遊戲特定邏輯）
 │       │   ├── ui-state.ts             # Vue reactive 狀態物件
 │       │   ├── SquatJumpUI.vue         # 遊戲 UI 元件（Vue 管理）
 │       │   ├── constants.ts            # 遊戲常數、跳躍配置、精靈座標
@@ -127,15 +130,31 @@ IDLE → ANTICIPATION → RISE → HANG → FALL → LAND → RECOVER → IDLE
 
 ### 關鍵架構概念
 
-#### GameModule 介面
-所有遊戲模組必須實作 `GameModule` 介面（定義於 `src/types/game.ts`）：
-- `init(canvas, ctx, characterSheets, itemSpritesheet)` — 初始化（不接收 DOM 容器）
-- `start()` / `stop()` / `destroy()` — 生命週期
-- `tick()` / `render(ctx)` — 由 App.vue 的 Fixed Timestep 迴圈驅動
-- `handleMessage(data, senderId?)` — Cast 訊息處理
-- `getUIComponent()` — 回傳遊戲的 Vue UI 元件
-- `setBroadcastCallbacks(broadcastFn, replyFn)` — 設定通訊回調
-- `setReturnToLobbyCallback?(fn)` — 返回 LOBBY 回調
+#### GameModule 介面與 Factory Pattern
+所有遊戲模組必須實作 `GameModule` 介面（定義於 `src/types/game.ts`），透過 `createGameModule()` 工廠函數建立（定義於 `src/games/shared/create-game-module.ts`）。
+
+**Factory 內建邏輯（遊戲不需重複實作）：**
+- 狀態管理（`changeState` + 廣播 STATE_UPDATE + 更新 UI 按鈕文字）
+- 通訊回調（`replyTo`、`broadcast`、`setBroadcastCallbacks`）
+- Cast 訊息路由（PLAYER_JOIN、PLAYER_LEAVE、START_GAME、RETURN_LOBBY）
+- 倒數動畫（3-2-1-GO! DOM 動畫 + 計時器 interval）
+- `destroy()` 自動重置（`state = createState()` 一行取代逐一歸零）
+
+**遊戲只需提供 config hooks：**
+- `createState()` — 遊戲專屬狀態工廠
+- `onInit` / `onDestroy` — 初始化與清理
+- `onTick` / `onRender` — 遊戲迴圈
+- `onAction` — 操作按鈕處理
+- `onMessage` — 遊戲專屬 Cast 訊息（SQUAT_JUMP、SHAKE、RUN_UPDATE 等）
+- `countdown` — 倒數+計時器配置（optional，Virtual Run 不使用）
+- `multiplayer` — 多人模式配置（optional，Virtual Run 不使用）
+
+**GameContext** — 遊戲 hooks 可存取的工具物件：
+- `state` — 遊戲專屬狀態（由 `createState()` 產生）
+- `getGameState()` / `changeState()` — 狀態查詢與切換
+- `broadcast()` / `replyTo()` — Cast 通訊
+- `isMultiplayerMode()` — 多人模式判斷
+- `stopGameTimer()` — 停止遊戲計時器
 
 #### 動態載入 (Code-Splitting)
 遊戲模組透過 `game-registry.ts` 的 `module: () => import(...)` 實現按需載入。Vite 自動將遊戲模組打包為獨立 chunk（含 Vue 元件和 scoped CSS）。
@@ -170,12 +189,14 @@ gameLoop(timestamp)
 | `GameCard.vue` | 單個遊戲卡片元件 |
 | `game-registry.ts` | 遊戲註冊表（ID、名稱、圖示、動態 import） |
 | `types/game.ts` | 所有 TypeScript 型別定義 |
+| `games/shared/create-game-module.ts` | GameModule 工廠函數（共用生命週期、訊息路由、倒數） |
+| `games/shared/types.ts` | GameConfig、GameContext 型別定義 |
 
 #### Squat Jump 遊戲模組
 
 | 模組 | 職責 |
 |------|------|
-| `index.ts` | GameModule 實作、狀態機、Cast 訊息處理 |
+| `index.ts` | 透過 createGameModule() 建立，定義跳躍特定邏輯 |
 | `ui-state.ts` | Vue reactive 狀態物件（遊戲邏輯更新此物件） |
 | `SquatJumpUI.vue` | 遊戲 UI 元件（等候室、倒數、分數、結束畫面、按鈕） |
 | `constants.ts` | 遊戲常數、跳躍配置、金幣配置、精靈座標、玩家顏色 |
@@ -286,7 +307,7 @@ Cast 應用永遠全螢幕橫向顯示，以 **1920px 為基準寬度**，所有
 ### Code Style
 - TypeScript strict mode
 - Vue 3 Composition API + `<script setup>`
-- 遊戲模組使用 module-level 狀態（`let` 變數），不用 class
+- 遊戲模組透過 `createGameModule()` 工廠建立，狀態收在 state object 中（`createState()` 工廠 + `destroy` 自動重置）
 - 每個模組職責單一，避免循環依賴
 - 遊戲 UI 使用 Vue 元件 + `<style scoped>`，CSS class 使用遊戲前綴（如 `squat-`、`shake-`）
 
@@ -322,7 +343,11 @@ Cast 應用永遠全螢幕橫向顯示，以 **1920px 為基準寬度**，所有
 1. 在 `src/games/[game-name]/` 建立模組目錄
 2. 建立 `ui-state.ts` — 定義 `reactive()` 狀態物件（遊戲邏輯更新此物件）
 3. 建立 `GameUI.vue` — UI 元件，綁定 reactive state，使用 `<style scoped>`
-4. 實作 `GameModule` 介面（參考 `squat-jump/index.ts`），`getUIComponent()` 回傳 Vue 元件
+4. 建立 `index.ts` — 使用 `createGameModule<TState>(config)` 工廠函數建立 GameModule：
+   - 定義 `interface GameState` + `createState()` 工廠
+   - 提供 `onTick`、`onRender`、`onAction`、`onMessage` hooks
+   - 設定 `countdown`（有倒數的遊戲）和 `multiplayer`（多人遊戲）
+   - 參考 `virtual-run/index.ts`（最簡範例）或 `squat-jump/index.ts`（完整範例）
 5. 在 `game-registry.ts` 註冊（設定 `available: true` 和 `module` 動態 import）
 6. 遊戲邏輯只更新 reactive state，不直接操作 DOM
 
