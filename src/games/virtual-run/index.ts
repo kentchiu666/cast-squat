@@ -13,6 +13,7 @@ interface VirtualRunState {
   totalTicks: number
   lastRunUpdateTick: number
   isRunning: boolean
+  waitingForVideo: boolean
 }
 
 const createState = (): VirtualRunState => ({
@@ -23,6 +24,7 @@ const createState = (): VirtualRunState => ({
   totalTicks: 0,
   lastRunUpdateTick: 0,
   isRunning: false,
+  waitingForVideo: false,
 })
 
 // === 開始遊戲 ===
@@ -34,13 +36,21 @@ function startGame(ctx: GameContext<VirtualRunState>): void {
   ctx.state.totalTicks = 0
   ctx.state.lastRunUpdateTick = 0
   ctx.state.isRunning = false
+  ctx.state.waitingForVideo = false
 
   uiState.distance = 0
   uiState.steps = 0
   uiState.elapsedTime = 0
 
-  ctx.changeState('PLAYING')
-  uiState.videoCommand = 'play'
+  if (uiState.videoReady) {
+    // 影片已載入，直接開始
+    ctx.changeState('PLAYING')
+    uiState.videoCommand = 'play'
+  } else {
+    // 影片尚未載入，等 onVideoReady 回調再切到 PLAYING
+    ctx.state.waitingForVideo = true
+    uiState.videoCommand = 'play'
+  }
 }
 
 // === 結束遊戲 ===
@@ -91,6 +101,12 @@ export default createGameModule<VirtualRunState>({
 
   onInit(ctx) {
     uiState.onVideoEnded = () => handleVideoEnded(ctx)
+    uiState.onVideoReady = () => {
+      if (ctx.state.waitingForVideo) {
+        ctx.state.waitingForVideo = false
+        ctx.changeState('PLAYING')
+      }
+    }
   },
 
   onAction(ctx) {

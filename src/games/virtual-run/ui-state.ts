@@ -19,6 +19,7 @@ export interface VirtualRunUIState {
   // 回調
   onAction: (() => void) | null
   onVideoEnded: (() => void) | null
+  onVideoReady: (() => void) | null
 }
 
 export const uiState = reactive<VirtualRunUIState>({
@@ -34,6 +35,7 @@ export const uiState = reactive<VirtualRunUIState>({
   actionButtonText: 'START RUN',
   onAction: null,
   onVideoEnded: null,
+  onVideoReady: null,
 })
 
 export function resetUIState(): void {
@@ -49,4 +51,5 @@ export function resetUIState(): void {
   uiState.actionButtonText = 'START RUN'
   uiState.onAction = null
   uiState.onVideoEnded = null
+  uiState.onVideoReady = null
 }

@@ -1,4 +1,5 @@
-export const YOUTUBE_VIDEO_ID = 'j5V7sxGGb_s'
+export const YOUTUBE_VIDEO_ID = 'OuSh_h-wzTE'
+export const YOUTUBE_START_SECONDS = 30
 
 export const DEFAULT_STRIDE_LENGTH = 0.7 // 公尺
 

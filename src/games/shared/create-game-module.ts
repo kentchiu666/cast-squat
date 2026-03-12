@@ -152,8 +152,8 @@ export function createGameModule<TState>(config: GameConfig<TState>): GameModule
     const mp = config.multiplayer
     if (!mp) {
       // 單人模式（如 Virtual Run）：直接接受加入
+      // 不回傳 STATE_UPDATE，避免觸發 sender 的 auto-rejoin 形成無限迴圈
       ctx.replyTo(senderId, { type: 'JOIN_RESULT', success: true })
-      ctx.replyTo(senderId, { type: 'STATE_UPDATE', state: gameState })
       return
     }
 

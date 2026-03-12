@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { uiState as state } from './ui-state'
-import { YOUTUBE_VIDEO_ID } from './constants'
+import { YOUTUBE_VIDEO_ID, YOUTUBE_START_SECONDS } from './constants'
 
 // === YouTube Player ===
 let player: YTPlayer | null = null
@@ -35,10 +35,12 @@ function createPlayer(): void {
       showinfo: 0,
       fs: 0,
       playsinline: 1,
+      start: YOUTUBE_START_SECONDS,
     },
     events: {
       onReady: () => {
         state.videoReady = true
+        state.onVideoReady?.()
         executeVideoCommand()
       },
       onStateChange: (event: { data: number }) => {
