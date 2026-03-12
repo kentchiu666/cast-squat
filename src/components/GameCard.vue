@@ -66,8 +66,8 @@ function handleClick() {
 
 <style scoped>
 .game-card {
-  width: 14.58vw;
-  padding: 1.56vw 1.04vw 1.25vw;
+  width: 23.44vw;
+  padding: 2.6vw 1.67vw 1.98vw;
   text-align: center;
   flex-shrink: 0;
   cursor: pointer;
@@ -126,13 +126,13 @@ function handleClick() {
 
 /* === 圖示 === */
 .game-card-icon {
-  width: 4.69vw;
-  height: 4.69vw;
-  margin: 0 auto 0.83vw;
+  width: 7.81vw;
+  height: 7.81vw;
+  margin: 0 auto 1.04vw;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.88vw;
+  font-size: 3.13vw;
   font-weight: bold;
   color: white;
   background: rgba(0, 0, 0, 0.2);
@@ -140,15 +140,15 @@ function handleClick() {
 }
 
 .game-card-name {
-  font-size: 0.94vw;
+  font-size: 1.46vw;
   color: white;
-  margin-bottom: 0.52vw;
+  margin-bottom: 0.63vw;
   line-height: 1.4;
   text-shadow: 0.1vw 0.1vw 0 rgba(0, 0, 0, 0.3);
 }
 
 .game-card-type {
-  font-size: 0.63vw;
+  font-size: 0.94vw;
   color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
   letter-spacing: 0.16vw;

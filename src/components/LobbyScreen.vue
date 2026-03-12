@@ -90,8 +90,8 @@
     </div>
 
     <!-- 角色吉祥物 -->
-    <canvas ref="mascotLeftRef" class="mascot mascot-left" width="240" height="260"></canvas>
-    <canvas ref="mascotRightRef" class="mascot mascot-right" width="240" height="260"></canvas>
+    <canvas ref="mascotLeftRef" class="mascot mascot-left" width="566" height="616"></canvas>
+    <canvas ref="mascotRightRef" class="mascot mascot-right" width="360" height="390"></canvas>
 
     <!-- 草地 -->
     <div class="ground"></div>
@@ -114,9 +114,12 @@ const mascotLeftRef = ref<HTMLCanvasElement | null>(null)
 const mascotRightRef = ref<HTMLCanvasElement | null>(null)
 let mascotAnimId = 0
 
-const MASCOT_SIZE = 180
-const MASCOT_CANVAS_W = 240
-const MASCOT_CANVAS_H = 260
+const MASCOT_SIZE = 270
+const MASCOT_SIZE_BEAR = 428
+const MASCOT_CANVAS_W = 360
+const MASCOT_CANVAS_H = 390
+const MASCOT_CANVAS_W_BEAR = 566
+const MASCOT_CANVAS_H_BEAR = 616
 
 // === 行為類型 ===
 type MascotAction = 'idle' | 'jump' | 'look' | 'nod'
@@ -256,13 +259,19 @@ function selectGameWithReaction(gameId: string): void {
   }, REACTION_DELAY)
 }
 
-function drawMascot(
-  ctx: CanvasRenderingContext2D,
-  sheet: HTMLImageElement,
-  state: MascotState,
-  needFaceBackground: boolean,
-  facingRight: boolean,
-): void {
+interface MascotDrawOptions {
+  ctx: CanvasRenderingContext2D
+  sheet: HTMLImageElement
+  state: MascotState
+  needFaceBackground: boolean
+  facingRight: boolean
+  size: number
+  canvasW: number
+  canvasH: number
+}
+
+function drawMascot(opts: MascotDrawOptions): void {
+  const { ctx, sheet, state, needFaceBackground, facingRight, size, canvasW, canvasH } = opts
   const t = state.timer + state.phaseOffset
   const body = standardSprites['BODY']!
   const face = standardSprites[state.faceKey]!
@@ -277,17 +286,17 @@ function drawMascot(
   // 左邊角色預設朝右(1)，右邊角色預設朝左(-1)
   const baseDir = facingRight ? 1 : -1
 
-  ctx.clearRect(0, 0, MASCOT_CANVAS_W, MASCOT_CANVAS_H)
+  ctx.clearRect(0, 0, canvasW, canvasH)
   ctx.save()
-  ctx.translate(MASCOT_CANVAS_W / 2 + swayOffset, MASCOT_CANVAS_H - 5 + bobOffset)
+  ctx.translate(canvasW / 2 + swayOffset, canvasH - 5 + bobOffset)
   ctx.rotate(state.nodAngle)
   ctx.scale(scaleX * baseDir * dirFlip, scaleY)
 
   // Face background（黑色底層，在 body 後面）
-  const faceH = 68
+  const faceH = size * 0.378
   const faceW = faceH * (face.w / face.h)
   const faceX = -faceW / 2
-  const faceY = -MASCOT_SIZE + 22
+  const faceY = -size + size * 0.122
   if (needFaceBackground) {
     ctx.fillStyle = '#000'
     ctx.beginPath()
@@ -299,7 +308,7 @@ function drawMascot(
   ctx.drawImage(
     sheet,
     body.x, body.y, body.w, body.h,
-    -MASCOT_SIZE / 2, -MASCOT_SIZE, MASCOT_SIZE, MASCOT_SIZE,
+    -size / 2, -size, size, size,
   )
   ctx.drawImage(
     sheet,
@@ -330,11 +339,11 @@ function mascotLoop(): void {
 
   if (leftCtx && sheets[0]) {
     updateMascotState(leftState)
-    drawMascot(leftCtx, sheets[0], leftState, false, true)
+    drawMascot({ ctx: leftCtx, sheet: sheets[0], state: leftState, needFaceBackground: false, facingRight: true, size: MASCOT_SIZE_BEAR, canvasW: MASCOT_CANVAS_W_BEAR, canvasH: MASCOT_CANVAS_H_BEAR })
   }
   if (rightCtx && sheets[1]) {
     updateMascotState(rightState)
-    drawMascot(rightCtx, sheets[1], rightState, true, false)
+    drawMascot({ ctx: rightCtx, sheet: sheets[1], state: rightState, needFaceBackground: true, facingRight: false, size: MASCOT_SIZE, canvasW: MASCOT_CANVAS_W, canvasH: MASCOT_CANVAS_H })
   }
 }
 
@@ -348,8 +357,8 @@ const selectedIndex = ref(0)
 const selectedGame = computed(() => games[selectedIndex.value]!)
 
 // === 卡片列偏移計算（vw 單位，基於 1920px 基準寬度）===
-const CARD_WIDTH_VW = 14.58
-const CARD_GAP_VW = 1.56
+const CARD_WIDTH_VW = 23.44
+const CARD_GAP_VW = 2.08
 const CARD_STEP_VW = CARD_WIDTH_VW + CARD_GAP_VW
 
 const trackOffset = computed(() => {
@@ -730,19 +739,21 @@ defineExpose({
 .mascot {
   position: absolute;
   bottom: 2.08vw;
-  width: 12.5vw;
-  height: 13.54vw;
   z-index: 2;
   pointer-events: none;
   image-rendering: pixelated;
 }
 
 .mascot-left {
-  left: 5%;
+  left: 1%;
+  width: 29.48vw;
+  height: 32.08vw;
 }
 
 .mascot-right {
   right: 5%;
+  width: 18.75vw;
+  height: 20.31vw;
 }
 
 /* === 草地 === */
