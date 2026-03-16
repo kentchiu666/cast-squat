@@ -42,7 +42,10 @@ function startGame(ctx: GameContext<VirtualRunState>): void {
   uiState.steps = 0
   uiState.elapsedTime = 0
 
-  // 無論影片是否已載入，都等影片實際開始播放（onVideoPlaying）才切到 PLAYING
+  // 通知 Sender 影片正在載入，請顯示 loading 狀態
+  ctx.broadcast({ type: 'VIDEO_LOADING' })
+
+  // 等影片實際開始播放（onVideoPlaying）才切到 PLAYING
   // 這樣可以避免 Sender 在影片還在 buffering 時就開始計步
   ctx.state.waitingForVideo = true
   uiState.videoCommand = 'play'
