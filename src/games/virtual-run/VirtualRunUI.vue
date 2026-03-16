@@ -44,6 +44,7 @@ function createPlayer(): void {
         executeVideoCommand()
       },
       onStateChange: (event: { data: number }) => {
+        console.log('[VirtualRun] onStateChange:', event.data)
         // YT.PlayerState.PLAYING = 1
         if (event.data === 1) {
           state.onVideoPlaying?.()
@@ -55,6 +56,8 @@ function createPlayer(): void {
       },
       onError: (event: { data: number }) => {
         console.warn('[VirtualRun] YouTube error:', event.data)
+        // 影片載入失敗時也觸發 onVideoPlaying，避免 Sender 永遠卡在 loading
+        state.onVideoPlaying?.()
       },
     },
   })

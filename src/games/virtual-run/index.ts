@@ -49,6 +49,15 @@ function startGame(ctx: GameContext<VirtualRunState>): void {
   // 這樣可以避免 Sender 在影片還在 buffering 時就開始計步
   ctx.state.waitingForVideo = true
   uiState.videoCommand = 'play'
+
+  // Fallback：如果 5 秒後影片仍未開始播放，強制進入 PLAYING
+  setTimeout(() => {
+    if (ctx.state.waitingForVideo) {
+      console.warn('[VirtualRun] Video play timeout, forcing PLAYING state')
+      ctx.state.waitingForVideo = false
+      ctx.changeState('PLAYING')
+    }
+  }, 5000)
 }
 
 // === 結束遊戲 ===
