@@ -44,6 +44,10 @@ function createPlayer(): void {
         executeVideoCommand()
       },
       onStateChange: (event: { data: number }) => {
+        // YT.PlayerState.PLAYING = 1
+        if (event.data === 1) {
+          state.onVideoPlaying?.()
+        }
         // YT.PlayerState.ENDED = 0
         if (event.data === 0) {
           state.onVideoEnded?.()
@@ -151,12 +155,12 @@ interface YTNamespace {
 
     <!-- YouTube Player -->
     <div
-      v-show="state.gameState === 'PLAYING' || state.gameState === 'GAME_OVER'"
+      v-show="state.gameState === 'PLAYING' || state.gameState === 'GAME_OVER' || state.videoCommand === 'play'"
       class="run-youtube-container"
     >
       <div id="run-youtube-player"></div>
-      <!-- Loading 提示（player 尚未 ready） -->
-      <div v-if="state.gameState === 'PLAYING' && !state.videoReady" class="run-loading">
+      <!-- Loading 提示（影片正在 buffering，等待實際播放） -->
+      <div v-if="state.videoCommand === 'play' && state.gameState !== 'PLAYING'" class="run-loading">
         LOADING VIDEO...
       </div>
     </div>

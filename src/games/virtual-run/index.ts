@@ -42,15 +42,10 @@ function startGame(ctx: GameContext<VirtualRunState>): void {
   uiState.steps = 0
   uiState.elapsedTime = 0
 
-  if (uiState.videoReady) {
-    // 影片已載入，直接開始
-    ctx.changeState('PLAYING')
-    uiState.videoCommand = 'play'
-  } else {
-    // 影片尚未載入，等 onVideoReady 回調再切到 PLAYING
-    ctx.state.waitingForVideo = true
-    uiState.videoCommand = 'play'
-  }
+  // 無論影片是否已載入，都等影片實際開始播放（onVideoPlaying）才切到 PLAYING
+  // 這樣可以避免 Sender 在影片還在 buffering 時就開始計步
+  ctx.state.waitingForVideo = true
+  uiState.videoCommand = 'play'
 }
 
 // === 結束遊戲 ===
@@ -101,7 +96,7 @@ export default createGameModule<VirtualRunState>({
 
   onInit(ctx) {
     uiState.onVideoEnded = () => handleVideoEnded(ctx)
-    uiState.onVideoReady = () => {
+    uiState.onVideoPlaying = () => {
       if (ctx.state.waitingForVideo) {
         ctx.state.waitingForVideo = false
         ctx.changeState('PLAYING')

@@ -8,6 +8,6 @@ export const RUN_CONFIG = {
   LOCAL_TEST_DISTANCE_PER_CLICK: 10,
   /** tick 頻率（每秒） */
   TICKS_PER_SECOND: 60,
-  /** 無收到 RUN_UPDATE 超過此 tick 數視為停止跑步，暫停影片（1.5 秒 = 90 ticks at 60fps） */
-  IDLE_TIMEOUT_TICKS: 90,
+  /** 無收到 RUN_UPDATE 超過此 tick 數視為停止跑步，暫停影片（1 秒 = 60 ticks at 60fps） */
+  IDLE_TIMEOUT_TICKS: 60,
 } as const
