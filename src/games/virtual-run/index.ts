@@ -99,6 +99,7 @@ export default createGameModule<VirtualRunState>({
   createState,
   uiState: uiState as unknown as Record<string, unknown>,
   resetUIState,
+  maxPlayers: 1,
 
   buttonText: {
     START_SCREEN: 'START RUN',

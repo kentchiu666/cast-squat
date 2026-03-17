@@ -94,6 +94,9 @@ export interface GameConfig<TState> {
   /** 倒數 + 計時器配置（null = 無倒數，直接操作 gameState） */
   countdown?: CountdownConfig<TState>
 
+  /** 無 multiplayer 時的最大玩家數（預設無限制） */
+  maxPlayers?: number
+
   /** 多人模式配置（null = 單人模式） */
   multiplayer?: MultiplayerConfig
 }

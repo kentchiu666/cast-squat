@@ -26,6 +26,7 @@ export function createGameModule<TState>(config: GameConfig<TState>): GameModule
   let returnToLobbyFn: (() => void) | null = null
   let countdownTimeouts: ReturnType<typeof setTimeout>[] = []
   let countdownInterval: ReturnType<typeof setInterval> | null = null
+  let singlePlayerJoinedIds: Set<string> = new Set()
 
   // === GameContext 建構 ===
   const ctx: GameContext<TState> = {
@@ -151,7 +152,12 @@ export function createGameModule<TState>(config: GameConfig<TState>): GameModule
   function handlePlayerJoin(playerId: string, playerName: string, senderId?: string): void {
     const mp = config.multiplayer
     if (!mp) {
-      // 單人模式（如 Virtual Run）：直接接受加入
+      // 單人模式（如 Virtual Run）：檢查人數上限
+      if (config.maxPlayers && singlePlayerJoinedIds.size >= config.maxPlayers && !singlePlayerJoinedIds.has(playerId)) {
+        ctx.replyTo(senderId, { type: 'JOIN_RESULT', success: false, reason: 'ROOM_FULL' })
+        return
+      }
+      singlePlayerJoinedIds.add(playerId)
       // 不回傳 STATE_UPDATE，避免觸發 sender 的 auto-rejoin 形成無限迴圈
       ctx.replyTo(senderId, { type: 'JOIN_RESULT', success: true })
       return
@@ -294,7 +300,8 @@ export function createGameModule<TState>(config: GameConfig<TState>): GameModule
       config.onDestroy?.(ctx)
       config.resetUIState()
 
-      // 一行重置所有遊戲狀態
+      // 重置所有遊戲狀態
+      singlePlayerJoinedIds = new Set()
       gameState = 'START_SCREEN'
       state = config.createState()
       ctx.state = state
