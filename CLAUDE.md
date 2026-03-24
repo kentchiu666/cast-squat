@@ -84,7 +84,8 @@ cast-squat/
 │           ├── courses/                # 賽道 + 風景模組化
 │           │   ├── types.ts            # TrackDef + ThemeDef 介面
 │           │   ├── tracks/
-│           │   │   └── jungle-loop.ts  # 叢林迴圈賽道
+│           │   │   ├── jungle-loop.ts  # 叢林迴圈賽道（fallback）
+│           │   │   └── random-track.ts # 隨機賽道生成器
 │           │   └── themes/
 │           │       └── jungle.ts       # 叢林視覺風格
 │           ├── layers/
@@ -276,10 +277,11 @@ gameLoop(timestamp)
 | 目錄 | 職責 |
 |------|------|
 | `courses/types.ts` | `TrackDef`（賽道形狀）+ `ThemeDef`（視覺風格）介面定義 |
-| `courses/tracks/jungle-loop.ts` | 叢林迴圈賽道（控制點 + 路寬 + 物件配置） |
+| `courses/tracks/jungle-loop.ts` | 叢林迴圈賽道（固定控制點，作為隨機生成失敗時的 fallback） |
+| `courses/tracks/random-track.ts` | 隨機賽道生成器（seeded PRNG + 圓形擾動控制點 + 自交檢測） |
 | `courses/themes/jungle.ts` | 叢林風格（天空、地面、道路、精靈顏色、霧效） |
 
-> **特殊性**：使用真正的 Mode 7 tilemap 透視投影渲染（仿 Mario Kart SNES），封閉迴圈賽道可繞建築物。賽道形狀（TrackDef）和視覺風格（ThemeDef）獨立模組化，可自由組合。手機傳步頻驅動場景速度。
+> **特殊性**：使用真正的 Mode 7 tilemap 透視投影渲染（仿 Mario Kart SNES），封閉迴圈賽道可繞建築物。賽道形狀（TrackDef）和視覺風格（ThemeDef）獨立模組化，可自由組合。每次開始遊戲自動生成隨機賽道，增加重玩性。手機傳步頻驅動場景速度。
 
 ### Cast Integration
 - **Application ID**: `DD35BB50`
@@ -395,6 +397,7 @@ Cast 應用永遠全螢幕橫向顯示，以 **1920px 為基準寬度**，所有
    - `jungle-run/tilemap.test.ts` — tilemap 生成驗證、tile 顏色表
    - `jungle-run/camera.test.ts` — 角度 lerp、攝影機更新
    - `jungle-run/npc.test.ts` — 環形距離計算、橡皮筋速度演算法
+   - `jungle-run/random-track.test.ts` — seeded PRNG、控制點生成、自交檢測、sharp curve 偵測
 
 ### Adding New Games
 1. 在 `src/games/[game-name]/` 建立模組目錄
@@ -488,7 +491,7 @@ gameAPI.returnToLobby()
 
 ### 單元測試
 ```bash
-npm test         # vitest run（158 個測試）
+npm test         # vitest run（176 個測試）
 npm run test:watch  # vitest watch 模式
 ```
 

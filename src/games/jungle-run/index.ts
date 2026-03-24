@@ -6,10 +6,13 @@ import { initRenderer, renderScene, destroyRenderer, getTrackLUT, getTrackLength
 import { cadenceToSpeed, lerp } from './cadence'
 import { updateCamera } from './camera'
 import type { CameraState } from './camera'
-import { jungleLoopTrack } from './courses/tracks/jungle-loop'
+import { generateRandomTrack } from './courses/tracks/random-track'
 import { jungleTheme } from './courses/themes/jungle'
 import { initNpc, resetNpc, tickNpc, getNpcScrollOffset, destroyNpc } from './npc'
 import JungleRunUI from './JungleRunUI.vue'
+
+// 保存 canvas context 供 startGame 重新初始化 renderer 使用
+let canvasCtxRef: CanvasRenderingContext2D | null = null
 
 // === 遊戲專屬狀態 ===
 interface JungleRunState {
@@ -60,6 +63,11 @@ function startGame(ctx: GameContext<JungleRunState>): void {
   uiState.elapsedTime = 0
   uiState.isRunning = false
 
+  // 每次開始都生成新的隨機賽道
+  destroyNpc()
+  destroyRenderer()
+  initRenderer(canvasCtxRef!, generateRandomTrack(), jungleTheme)
+  initNpc()
   resetNpc(ctx.state.scrollOffset)
   ctx.changeState('PLAYING')
 }
@@ -104,7 +112,8 @@ export default createGameModule<JungleRunState>({
   },
 
   onInit(_ctx, _canvas, canvasCtx) {
-    initRenderer(canvasCtx, jungleLoopTrack, jungleTheme)
+    canvasCtxRef = canvasCtx
+    initRenderer(canvasCtx, generateRandomTrack(), jungleTheme)
     initNpc()
     console.log('[JungleRun] Mode 7 initialized')
   },
@@ -244,5 +253,6 @@ export default createGameModule<JungleRunState>({
   onDestroy() {
     destroyNpc()
     destroyRenderer()
+    canvasCtxRef = null
   },
 })

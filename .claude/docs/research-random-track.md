@@ -1,6 +1,6 @@
 # 隨機賽道生成 — 研究筆記
 
-> 狀態：**待討論**（先完成 jungle-run POC 再回來）
+> 狀態：**已完成** — 採用方案 A（圓形擾動控制點），已實作於 `courses/tracks/random-track.ts`
 
 ## 需求
 
