@@ -48,6 +48,17 @@ export const GAMES: GameInfo[] = [
     module: () => import('./games/jungle-run/index'),
   },
   {
+    id: 'hill_run',
+    name: 'Hill Run',
+    description: 'Run through 3D hills!',
+    icon: 'HR',
+    iconColor: '#6BCB77',
+    type: 'ENDURE',
+    typeLabel: 'Endure',
+    available: true,
+    module: () => import('./games/hill-run/index'),
+  },
+  {
     id: 'pan_flip',
     name: 'Pan Flip',
     description: 'Flip the pan perfectly!',
