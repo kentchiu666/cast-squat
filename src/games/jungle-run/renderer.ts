@@ -11,7 +11,8 @@ import { initMode7, renderMode7Ground, destroyMode7 } from './mode7'
 import { initWorldObjects, generateWorldObjects, projectObjects, renderWorldObjects, destroyWorldObjects } from './world-objects'
 import type { WorldObject } from './world-objects'
 import type { TrackDef, ThemeDef } from './courses/types'
-import { CAMERA_CONFIG, SPEED_LINE_CONFIG, TRACK_CONFIG, MODE7_CONFIG } from './constants'
+import { CAMERA_CONFIG, SPEED_LINE_CONFIG, TRACK_CONFIG, MODE7_CONFIG, NPC_CONFIG } from './constants'
+import { renderNpc } from './npc'
 
 const REFERENCE_WIDTH = 1920
 const REFERENCE_HEIGHT = 1080
@@ -78,6 +79,7 @@ export interface RenderParams {
   cameraX: number
   cameraZ: number
   cameraAngle: number
+  npcScrollOffset: number
 }
 
 export function renderScene(
@@ -106,6 +108,9 @@ export function renderScene(
   const projected = projectObjects(worldObjects, cameraX, cameraZ, cameraAngle)
   renderWorldObjects(ctx, projected)
 
+  // NPC 陪跑者
+  renderNpc(ctx, cameraX, cameraZ, cameraAngle)
+
   // 飄浮粒子（螢火蟲/光點）
   drawParticles(ctx, totalTicks, speed)
 
@@ -120,7 +125,7 @@ export function renderScene(
   ctx.restore()
 
   // Minimap（不受鏡頭晃動影響）
-  drawMinimap(ctx, scrollOffset)
+  drawMinimap(ctx, scrollOffset, params.npcScrollOffset)
 }
 
 // === 速度線 ===
@@ -223,16 +228,29 @@ function prerenderMinimap(): void {
   strokeTrackPath(ctx, minimapTransform, 'rgba(255, 255, 255, 0.3)', 1)
 }
 
-function drawMinimap(ctx: CanvasRenderingContext2D, scrollOffset: number): void {
+function drawMinimap(ctx: CanvasRenderingContext2D, scrollOffset: number, npcScrollOffset: number): void {
   if (!minimapCanvas || trackLUT.length === 0 || trackLength <= 0) return
 
   ctx.drawImage(minimapCanvas, MINIMAP_X, MINIMAP_Y, MINIMAP_SIZE, MINIMAP_SIZE)
 
+  const { minX, minZ, scale, offsetX, offsetZ } = minimapTransform
+
+  // NPC 橙色點（先畫，在玩家下面）
+  const npcD = ((npcScrollOffset % trackLength) + trackLength) % trackLength
+  const npcSample = findNearestSample(npcD)
+  if (npcSample) {
+    const npcPx = MINIMAP_X + (npcSample.x - minX) * scale + offsetX
+    const npcPy = MINIMAP_Y + (npcSample.z - minZ) * scale + offsetZ
+    const dotSize = NPC_CONFIG.MINIMAP_DOT_SIZE
+    ctx.fillStyle = NPC_CONFIG.MINIMAP_COLOR
+    ctx.fillRect(Math.floor(npcPx - dotSize / 2), Math.floor(npcPy - dotSize / 2), dotSize, dotSize)
+  }
+
+  // 玩家綠色點
   const d = ((scrollOffset % trackLength) + trackLength) % trackLength
   const sample = findNearestSample(d)
   if (!sample) return
 
-  const { minX, minZ, scale, offsetX, offsetZ } = minimapTransform
   const px = MINIMAP_X + (sample.x - minX) * scale + offsetX
   const py = MINIMAP_Y + (sample.z - minZ) * scale + offsetZ
 

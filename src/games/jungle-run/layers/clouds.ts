@@ -38,14 +38,14 @@ function prerenderCloud(
 
   // 陰影層（向下偏移 2px）
   ctx.fillStyle = shadowColor
-  for (const [bx, by, bw, bh] of shape.blocks) {
-    ctx.fillRect(bx, by + 2, bw, bh)
+  for (const block of shape.blocks) {
+    ctx.fillRect(block[0]!, block[1]! + 2, block[2]!, block[3]!)
   }
 
   // 主色層
   ctx.fillStyle = color
-  for (const [bx, by, bw, bh] of shape.blocks) {
-    ctx.fillRect(bx, by, bw, bh)
+  for (const block of shape.blocks) {
+    ctx.fillRect(block[0]!, block[1]!, block[2]!, block[3]!)
   }
 
   return canvas

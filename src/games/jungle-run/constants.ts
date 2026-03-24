@@ -87,6 +87,43 @@ export const WORLD_OBJECT_CONFIG = {
   MAX_RENDERED_OBJECTS: 20,
 } as const
 
+// === NPC 陪跑 ===
+export const NPC_CONFIG = {
+  // 橡皮筋行為
+  BASE_SPEED: 3.5,
+  RUBBER_BAND_STRENGTH: 0.02,
+  COMFORT_DISTANCE: 80,
+  MAX_SPEED_MULT: 2.0,
+  MIN_SPEED_MULT: 0.1,
+  SPEED_LERP: 0.03,
+  INITIAL_LEAD: 50,
+  // 車道
+  LANE_OFFSET: 25,
+  // 精靈
+  SPRITE_WIDTH: 12,
+  SPRITE_HEIGHT: 20,
+  COLOR: '#FF8C42',
+  ALPHA: 0.85,
+  // 名稱標籤
+  NAME: 'PACER',
+  NAME_FONT_SCALE: 1.8,
+  NAME_OFFSET_Y: 8,
+  // 對話氣泡
+  BUBBLE_MESSAGES: ['GO GO!', 'NICE!', 'KEEP UP!', 'FASTER!', 'YEAH!'] as readonly string[],
+  BUBBLE_MIN_INTERVAL: 300,
+  BUBBLE_MAX_INTERVAL: 600,
+  BUBBLE_DURATION: 120,
+  BUBBLE_FONT_SCALE: 1.5,
+  BUBBLE_PADDING: 6,
+  BUBBLE_OFFSET_Y: 24,
+  BUBBLE_BG: '#ffffff',
+  BUBBLE_TEXT_COLOR: '#333333',
+  BUBBLE_TAIL_SIZE: 4,
+  // Minimap
+  MINIMAP_COLOR: '#FF8C42',
+  MINIMAP_DOT_SIZE: 6,
+} as const
+
 // === 遊戲設定 ===
 export const GAME_CONFIG = {
   TICKS_PER_SECOND: 60,

@@ -8,6 +8,7 @@ import { updateCamera } from './camera'
 import type { CameraState } from './camera'
 import { jungleLoopTrack } from './courses/tracks/jungle-loop'
 import { jungleTheme } from './courses/themes/jungle'
+import { initNpc, resetNpc, tickNpc, getNpcScrollOffset, destroyNpc } from './npc'
 import JungleRunUI from './JungleRunUI.vue'
 
 // === 遊戲專屬狀態 ===
@@ -59,6 +60,7 @@ function startGame(ctx: GameContext<JungleRunState>): void {
   uiState.elapsedTime = 0
   uiState.isRunning = false
 
+  resetNpc(ctx.state.scrollOffset)
   ctx.changeState('PLAYING')
 }
 
@@ -103,6 +105,7 @@ export default createGameModule<JungleRunState>({
 
   onInit(_ctx, _canvas, canvasCtx) {
     initRenderer(canvasCtx, jungleLoopTrack, jungleTheme)
+    initNpc()
     console.log('[JungleRun] Mode 7 initialized')
   },
 
@@ -208,6 +211,14 @@ export default createGameModule<JungleRunState>({
       ctx.state.cameraZ = cam.z
       ctx.state.cameraAngle = cam.angle
 
+      // NPC 更新
+      tickNpc(
+        ctx.state.scrollOffset,
+        ctx.state.currentSpeed,
+        getTrackLength_(),
+        getTrackLUT(),
+      )
+
       // 圈數計算
       const tLen = getTrackLength_()
       if (tLen > 0) {
@@ -226,10 +237,12 @@ export default createGameModule<JungleRunState>({
       cameraX: ctx.state.cameraX,
       cameraZ: ctx.state.cameraZ,
       cameraAngle: ctx.state.cameraAngle,
+      npcScrollOffset: getNpcScrollOffset(),
     })
   },
 
   onDestroy() {
+    destroyNpc()
     destroyRenderer()
   },
 })

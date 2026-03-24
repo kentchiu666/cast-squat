@@ -266,7 +266,8 @@ gameLoop(timestamp)
 | `mode7.ts` | Mode 7 地面渲染（ImageData 逐像素透視投影） |
 | `camera.ts` | 攝影機跟隨賽道 + 角度 lerp 平滑 |
 | `world-objects.ts` | 世界物件投影（樹、灌木、石頭、建築物） |
-| `renderer.ts` | 主渲染器（sky → mode7 → objects → lightRays → minimap） |
+| `npc.ts` | NPC 陪跑者（橡皮筋行為、像素精靈、投影繪製） |
+| `renderer.ts` | 主渲染器（sky → mode7 → objects → npc → lightRays → minimap） |
 | `layers/sky.ts` | 天空漸層 + 遠山剪影（offscreen 預渲染） |
 | `layers/light-rays.ts` | 林間漏光效果（走/跑 alpha 變化） |
 
@@ -393,6 +394,7 @@ Cast 應用永遠全螢幕橫向顯示，以 **1920px 為基準寬度**，所有
    - `jungle-run/track.test.ts` — Catmull-Rom 插值、LUT 建立、賽道取樣
    - `jungle-run/tilemap.test.ts` — tilemap 生成驗證、tile 顏色表
    - `jungle-run/camera.test.ts` — 角度 lerp、攝影機更新
+   - `jungle-run/npc.test.ts` — 環形距離計算、橡皮筋速度演算法
 
 ### Adding New Games
 1. 在 `src/games/[game-name]/` 建立模組目錄
@@ -486,7 +488,7 @@ gameAPI.returnToLobby()
 
 ### 單元測試
 ```bash
-npm test         # vitest run（144 個測試）
+npm test         # vitest run（158 個測試）
 npm run test:watch  # vitest watch 模式
 ```
 
