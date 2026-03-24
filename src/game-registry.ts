@@ -37,6 +37,17 @@ export const GAMES: GameInfo[] = [
     module: () => import('./games/virtual-run/index'),
   },
   {
+    id: 'jungle_run',
+    name: 'Jungle Run',
+    description: 'Run through a pixel jungle!',
+    icon: 'JR',
+    iconColor: '#2ECC71',
+    type: 'ENDURE',
+    typeLabel: 'Endure',
+    available: true,
+    module: () => import('./games/jungle-run/index'),
+  },
+  {
     id: 'pan_flip',
     name: 'Pan Flip',
     description: 'Flip the pan perfectly!',

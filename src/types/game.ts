@@ -57,7 +57,8 @@ export type CastMessageData =
   | { action: 'SQUAT_JUMP'; playerId?: string }
   | { action: 'SHAKE'; playerId?: string }
   | { action: 'GAME_RESULT'; playerId: string; score: number; details?: { shakes: number } }
-  | { action: 'RUN_UPDATE'; playerId?: string; steps: number; distance: number }
+  | { action: 'RUN_UPDATE'; playerId?: string; steps: number; distance: number; cadence?: number }
+  | { action: 'END_RUN'; playerId?: string }
   | string  // 舊版相容
 
 // === 精簡遊戲資訊（Cast 廣播用，去掉不可序列化的 module）===

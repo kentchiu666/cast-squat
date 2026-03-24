@@ -64,11 +64,33 @@ cast-squat/
 │       │   ├── character.ts            # 搖晃角色繪製、彩色精靈圖
 │       │   ├── effects.ts              # 螢幕震動
 │       │   └── players.ts              # 多人玩家管理（8 人、結果提交）
-│       └── virtual-run/                # 虛擬跑步遊戲模組（Demo）
-│           ├── index.ts                # GameModule 實作（YouTube + 距離累積）
+│       ├── virtual-run/                # 虛擬跑步遊戲模組（Demo）
+│       │   ├── index.ts                # GameModule 實作（YouTube + 距離累積）
+│       │   ├── ui-state.ts             # Vue reactive 狀態物件
+│       │   ├── VirtualRunUI.vue        # 遊戲 UI 元件（YouTube iframe + 距離 bar）
+│       │   └── constants.ts            # 遊戲常數（影片 ID、步幅）
+│       └── jungle-run/                 # 叢林跑步遊戲模組（Mode 7 賽道）
+│           ├── index.ts                # GameModule 實作（步頻驅動、攝影機更新）
 │           ├── ui-state.ts             # Vue reactive 狀態物件
-│           ├── VirtualRunUI.vue        # 遊戲 UI 元件（YouTube iframe + 距離 bar）
-│           └── constants.ts            # 遊戲常數（影片 ID、步幅）
+│           ├── JungleRunUI.vue         # 遊戲 UI 元件（HUD + GAME_OVER）
+│           ├── constants.ts            # Engine 常數（Mode 7、Camera、Cadence）
+│           ├── cadence.ts              # 步頻→速度映射、lerp、走跑判定
+│           ├── track.ts                # Catmull-Rom spline 賽道路徑 + LUT
+│           ├── tilemap.ts              # 程式化生成 tilemap + 顏色表
+│           ├── mode7.ts                # Mode 7 地面渲染（ImageData 透視投影）
+│           ├── camera.ts               # 攝影機跟隨賽道 + 角度平滑
+│           ├── world-objects.ts        # 世界物件投影（樹、建築物）
+│           ├── renderer.ts             # 主渲染器 + Minimap
+│           ├── courses/                # 賽道 + 風景模組化
+│           │   ├── types.ts            # TrackDef + ThemeDef 介面
+│           │   ├── tracks/
+│           │   │   └── jungle-loop.ts  # 叢林迴圈賽道
+│           │   └── themes/
+│           │       └── jungle.ts       # 叢林視覺風格
+│           ├── layers/
+│           │   ├── sky.ts              # 天空漸層 + 遠山（offscreen 預渲染）
+│           │   └── light-rays.ts       # 林間漏光效果
+│           └── __tests__/              # 單元測試
 ├── kenney_shape-characters/            # Kenney 免費角色素材包
 │   └── Spritesheet/
 │       ├── spritesheet_default.png
@@ -230,6 +252,34 @@ gameLoop(timestamp)
 
 > **特殊性**：此遊戲不使用 Canvas 繪製（`render()` 為空操作），影片由 YouTube iframe 渲染，UI 由 Vue DOM 管理。
 
+#### Jungle Run 遊戲模組（Mode 7 賽道）
+
+| 模組 | 職責 |
+|------|------|
+| `index.ts` | GameModule 實作、步頻驅動、攝影機更新 |
+| `ui-state.ts` | Vue reactive 狀態物件（距離、步數、步頻） |
+| `JungleRunUI.vue` | 遊戲 UI 元件（START_SCREEN、HUD、GAME_OVER） |
+| `constants.ts` | Engine 常數（Mode 7、Tilemap、Camera、Cadence） |
+| `cadence.ts` | 步頻→速度映射、lerp 平滑、走跑判定 |
+| `track.ts` | Catmull-Rom spline 賽道路徑 + LUT 查詢 |
+| `tilemap.ts` | 程式化生成 128x128 tilemap + 霧化顏色表 |
+| `mode7.ts` | Mode 7 地面渲染（ImageData 逐像素透視投影） |
+| `camera.ts` | 攝影機跟隨賽道 + 角度 lerp 平滑 |
+| `world-objects.ts` | 世界物件投影（樹、灌木、石頭、建築物） |
+| `renderer.ts` | 主渲染器（sky → mode7 → objects → lightRays → minimap） |
+| `layers/sky.ts` | 天空漸層 + 遠山剪影（offscreen 預渲染） |
+| `layers/light-rays.ts` | 林間漏光效果（走/跑 alpha 變化） |
+
+**賽道 + 風景模組化架構：**
+
+| 目錄 | 職責 |
+|------|------|
+| `courses/types.ts` | `TrackDef`（賽道形狀）+ `ThemeDef`（視覺風格）介面定義 |
+| `courses/tracks/jungle-loop.ts` | 叢林迴圈賽道（控制點 + 路寬 + 物件配置） |
+| `courses/themes/jungle.ts` | 叢林風格（天空、地面、道路、精靈顏色、霧效） |
+
+> **特殊性**：使用真正的 Mode 7 tilemap 透視投影渲染（仿 Mario Kart SNES），封閉迴圈賽道可繞建築物。賽道形狀（TrackDef）和視覺風格（ThemeDef）獨立模組化，可自由組合。手機傳步頻驅動場景速度。
+
 ### Cast Integration
 - **Application ID**: `DD35BB50`
 - **Namespace**: `urn:x-cast:com.example.castsquat`
@@ -249,7 +299,8 @@ gameLoop(timestamp)
   - 搖晃：`{ action: 'SHAKE', playerId: 'xxx' }`
   - 開始/重新開始：`{ action: 'START_GAME' }`
   - 提交結果：`{ action: 'GAME_RESULT', playerId, score, details }`
-  - 跑步更新：`{ action: 'RUN_UPDATE', playerId, steps, distance }`
+  - 跑步更新：`{ action: 'RUN_UPDATE', playerId, steps, distance, cadence? }`
+  - 結束跑步：`{ action: 'END_RUN', playerId? }`
 - **Receiver → Sender 廣播**：
   - `{ type: 'PLATFORM_STATE', state: 'LOBBY' | 'GAME_ACTIVE', gameId?, gameState? }`
   - `{ type: 'LOBBY_STATE', games: GameInfoSlim[], selectedIndex: number }`
@@ -338,6 +389,10 @@ Cast 應用永遠全螢幕橫向顯示，以 **1920px 為基準寬度**，所有
    - `squat-jump/character.test.ts` — 7 階段跳躍狀態機轉換、squash/stretch、高度約束
    - `shake-it/players.test.ts` — 8 人玩家管理、結果提交、排行榜
    - `shake-it/character.test.ts` — 搖晃動畫數學函數
+   - `jungle-run/cadence.test.ts` — 步頻→速度映射、lerp、走跑判定
+   - `jungle-run/track.test.ts` — Catmull-Rom 插值、LUT 建立、賽道取樣
+   - `jungle-run/tilemap.test.ts` — tilemap 生成驗證、tile 顏色表
+   - `jungle-run/camera.test.ts` — 角度 lerp、攝影機更新
 
 ### Adding New Games
 1. 在 `src/games/[game-name]/` 建立模組目錄
@@ -431,7 +486,7 @@ gameAPI.returnToLobby()
 
 ### 單元測試
 ```bash
-npm test         # vitest run（103 個測試）
+npm test         # vitest run（144 個測試）
 npm run test:watch  # vitest watch 模式
 ```
 
