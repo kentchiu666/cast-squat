@@ -70,7 +70,7 @@ export const MODE7_CONFIG = {
 
 // === Tilemap ===
 export const TILEMAP_CONFIG = {
-  MAP_SIZE: 128,
+  MAP_SIZE: 256,
   TILE_SIZE: 16,
 } as const
 
@@ -84,8 +84,8 @@ export const TRACK_CONFIG = {
 // === 隨機賽道生成 ===
 export const RANDOM_TRACK_CONFIG = {
   NUM_POINTS: 10,
-  BASE_RADIUS: 400,
-  RADIUS_JITTER: 150,
+  BASE_RADIUS: 700,
+  RADIUS_JITTER: 200,
   ANGLE_JITTER: 0.15,
   MIN_POINT_DISTANCE: 120,
   ROAD_HALF_WIDTH_TILES: 5,
@@ -94,7 +94,7 @@ export const RANDOM_TRACK_CONFIG = {
   LANE_OFFSET_MAX: 150,
   MAX_BUILDINGS: 2,
   CURVATURE_THRESHOLD: 0.3,
-  WORLD_BOUND: 800,
+  WORLD_BOUND: 1600,
   MAX_RETRIES: 5,
 } as const
 
