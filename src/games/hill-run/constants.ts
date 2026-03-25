@@ -1,6 +1,6 @@
 // === Hill Run 遊戲常數 ===
 
-// === 步頻配置（複用 jungle-run 的設計）===
+// === 步頻配置 ===
 export const CADENCE_CONFIG = {
   WALK_THRESHOLD: 60,
   RUN_THRESHOLD: 120,
@@ -19,22 +19,41 @@ export const TRACK_CONFIG = {
   NUM_POINTS: 12,
   BASE_RADIUS: 200,
   ROAD_WIDTH: 12,
-  ROAD_SEGMENTS: 100,
-  // 高度起伏
-  HILL_AMPLITUDE: 15,
+  SHOULDER_WIDTH: 3,
+  ROAD_SEGMENTS: 120,
+  HILL_AMPLITUDE: 18,
   HILL_FREQUENCY_1: 2,
   HILL_FREQUENCY_2: 3.7,
-  HILL_RANDOM_JITTER: 5,
+  HILL_RANDOM_JITTER: 6,
 } as const
 
 // === 3D 場景配置 ===
 export const SCENE_CONFIG = {
-  CAMERA_HEIGHT: 5,
-  CAMERA_BEHIND: 10,
-  CAMERA_LOOK_AHEAD: 20,
-  FOG_NEAR: 80,
-  FOG_FAR: 250,
-  RENDER_SCALE: 0.5,   // 半解析度渲染（Chromecast v3 效能）
+  CAMERA_HEIGHT: 4,
+  CAMERA_LOOK_AHEAD: 25,
+  FOG_NEAR: 100,
+  FOG_FAR: 300,
+  RENDER_SCALE: 0.5,
+  GROUND_SIZE: 800,
+  GROUND_SEGMENTS: 63,
+  SKY_RADIUS: 400,
+  CLOUD_COUNT: 8,
+  CLOUD_HEIGHT: 80,
+} as const
+
+// === 路邊物件配置 ===
+export const OBJECT_CONFIG = {
+  PINE_TREE_COUNT: 15,
+  BROAD_TREE_COUNT: 10,
+  BUSH_COUNT: 20,
+  ROCK_COUNT: 12,
+  FLOWER_COUNT: 15,
+  NEAR_OFFSET_MIN: 8,
+  NEAR_OFFSET_MAX: 15,
+  MID_OFFSET_MIN: 15,
+  MID_OFFSET_MAX: 25,
+  FAR_OFFSET_MIN: 25,
+  FAR_OFFSET_MAX: 40,
 } as const
 
 // === 遊戲設定 ===

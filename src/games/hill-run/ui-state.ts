@@ -20,6 +20,8 @@ export const uiState = reactive({
   actionButtonText: 'START RUN',
   // 回調
   onAction: null as (() => void) | null,
+  // WebGL
+  webglFailed: false,
 })
 
 export function resetUIState(): void {
@@ -36,4 +38,5 @@ export function resetUIState(): void {
   uiState.finalTime = 0
   uiState.actionButtonText = 'START RUN'
   uiState.onAction = null
+  uiState.webglFailed = false
 }

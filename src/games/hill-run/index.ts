@@ -3,7 +3,7 @@ import { createGameModule } from '../shared/create-game-module'
 import { uiState, resetUIState } from './ui-state'
 import { GAME_CONFIG, CADENCE_CONFIG } from './constants'
 import { cadenceToSpeed, lerp } from './cadence'
-import { initScene, buildTrack, updateSceneCamera, renderFrame, destroyScene, getTrackLength } from './scene'
+import { initScene, buildTrack, updateSceneCamera, renderFrame, destroyScene, getTrackLength, isWebGLSupported } from './scene'
 import { generateTrack3D } from './track'
 import HillRunUI from './HillRunUI.vue'
 
@@ -94,6 +94,11 @@ export default createGameModule<HillRunState>({
   onInit(_ctx, canvas) {
     hostCanvasRef = canvas
     initScene(canvas)
+    if (!isWebGLSupported()) {
+      uiState.webglFailed = true
+      console.error('[HillRun] WebGL not available, game cannot run')
+      return
+    }
     const trackPoints = generateTrack3D()
     buildTrack(trackPoints)
     console.log('[HillRun] 3D scene initialized')

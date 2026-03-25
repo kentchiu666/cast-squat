@@ -20,8 +20,15 @@ const formattedFinalTime = computed(() => {
 
 <template>
   <div class="hill-overlay">
+    <!-- WebGL 不支援 -->
+    <div v-if="state.webglFailed" class="hill-webgl-error">
+      <div class="hill-title" style="color: #ff6b6b">WEBGL ERROR</div>
+      <div class="hill-subtitle">This device does not support WebGL.</div>
+      <div class="hill-hint">Hill Run requires a WebGL-capable device.<br/>Please try a different game.</div>
+    </div>
+
     <!-- START_SCREEN -->
-    <div v-show="state.gameState === 'START_SCREEN'" class="hill-start-screen">
+    <div v-show="!state.webglFailed && state.gameState === 'START_SCREEN'" class="hill-start-screen">
       <div class="hill-title">HILL RUN</div>
       <div class="hill-subtitle">3D Trail Adventure</div>
       <div class="hill-hint">
@@ -67,6 +74,18 @@ const formattedFinalTime = computed(() => {
   font-family: 'Press Start 2P', cursive;
   color: #fff;
   z-index: 10;
+}
+
+/* WebGL Error */
+.hill-webgl-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 3vw 5vw;
+  border: max(1px, 0.15vw) solid #ff6b6b;
 }
 
 /* START_SCREEN */
