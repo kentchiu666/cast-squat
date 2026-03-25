@@ -142,10 +142,20 @@ export default createGameModule<HillRunState>({
     }
     if (data.action === 'RUN_UPDATE' && ctx.getGameState() === 'PLAYING') {
       if ('distance' in data) {
+        const prevDistance = ctx.state.distance
         ctx.state.distance = data.distance as number
         ctx.state.steps = data.steps as number
         uiState.distance = ctx.state.distance
         uiState.steps = ctx.state.steps
+
+        // 沒有 cadence 時，從 distance 變化量推算速度（驅動攝影機移動）
+        if (!('cadence' in data)) {
+          const delta = ctx.state.distance - prevDistance
+          if (delta > 0) {
+            ctx.state.targetSpeed = Math.min(1, delta / 5)
+            ctx.state.scrollOffset += delta * 2
+          }
+        }
       }
       if ('cadence' in data && typeof data.cadence === 'number') {
         ctx.state.cadence = data.cadence
