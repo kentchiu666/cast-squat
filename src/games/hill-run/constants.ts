@@ -11,7 +11,7 @@ export const CADENCE_CONFIG = {
   SPEED_LERP_FACTOR: 0.05,
   BLEND_LERP_FACTOR: 0.03,
   IDLE_TIMEOUT_TICKS: 120,
-  BASE_SCROLL_SPEED: 8,
+  BASE_SCROLL_SPEED: 1,
 } as const
 
 // === 賽道配置 ===
@@ -54,6 +54,16 @@ export const OBJECT_CONFIG = {
   MID_OFFSET_MAX: 25,
   FAR_OFFSET_MIN: 25,
   FAR_OFFSET_MAX: 40,
+} as const
+
+// === NPC 陪跑配置 ===
+export const NPC_CONFIG = {
+  MODEL_PATH: '/models/Soldier.glb',
+  SCALE: 2,
+  AHEAD_DISTANCE: 30,         // NPC 在玩家前方多遠
+  RUBBER_BAND_SPEED: 0.03,    // 橡皮筋回彈速度
+  BASE_SPEED: 0.15,           // NPC 基礎速度
+  Y_OFFSET: 0.5,              // 模型 Y 偏移（腳底貼地）
 } as const
 
 // === 遊戲設定 ===

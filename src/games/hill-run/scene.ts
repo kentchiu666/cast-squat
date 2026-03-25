@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { SCENE_CONFIG, TRACK_CONFIG, OBJECT_CONFIG } from './constants'
+import { initNpc, destroyNpc } from './npc'
 
 // === Module-level Three.js 物件 ===
 let renderer: THREE.WebGLRenderer | null = null
@@ -82,6 +83,11 @@ export function buildTrack(points: TrackPoint3D[]): void {
   buildRoad(trackCurve)
   buildTerrain(trackCurve)
   addRoadSideObjects(trackCurve)
+
+  // NPC 陪跑者
+  if (scene) {
+    initNpc(scene, trackCurve, trackLength)
+  }
 }
 
 // ============================================================
@@ -429,6 +435,7 @@ export function renderFrame(): void {
 }
 
 export function destroyScene(hostCanvas: HTMLCanvasElement): void {
+  destroyNpc()
   if (webglCanvas) { webglCanvas.remove(); webglCanvas = null }
   hostCanvas.style.display = ''
   if (renderer) { renderer.dispose(); renderer = null }

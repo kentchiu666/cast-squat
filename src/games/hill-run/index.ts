@@ -4,6 +4,7 @@ import { uiState, resetUIState } from './ui-state'
 import { GAME_CONFIG, CADENCE_CONFIG } from './constants'
 import { cadenceToSpeed, lerp } from './cadence'
 import { initScene, buildTrack, updateSceneCamera, renderFrame, destroyScene, getTrackLength, isWebGLSupported } from './scene'
+import { updateNpc } from './npc'
 import { generateTrack3D } from './track'
 import HillRunUI from './HillRunUI.vue'
 
@@ -204,6 +205,9 @@ export default createGameModule<HillRunState>({
 
       // 攝影機跟隨
       updateSceneCamera(ctx.state.scrollOffset)
+
+      // NPC 陪跑更新
+      updateNpc(ctx.state.scrollOffset, ctx.state.currentSpeed, 1 / GAME_CONFIG.TICKS_PER_SECOND)
 
       // 圈數
       const tLen = getTrackLength()
