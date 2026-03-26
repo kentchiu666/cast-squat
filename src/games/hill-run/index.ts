@@ -154,12 +154,12 @@ export default createGameModule<HillRunState>({
         uiState.distance = ctx.state.distance
         uiState.steps = ctx.state.steps
 
-        // 沒有 cadence 時，從 distance 變化量推算速度（驅動攝影機移動）
+        // 沒有 cadence 時，從 distance 變化量推算速度
+        // 注意：只更新 targetSpeed，scrollOffset 由 onTick 的 lerp 驅動，避免跳變抽動
         if (!('cadence' in data)) {
           const delta = ctx.state.distance - prevDistance
           if (delta > 0) {
-            ctx.state.targetSpeed = Math.min(1, delta / 5)
-            ctx.state.scrollOffset += delta * 2
+            ctx.state.targetSpeed = Math.min(1, delta / 3)
           }
         }
       }

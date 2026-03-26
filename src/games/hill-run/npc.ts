@@ -35,7 +35,8 @@ export function initNpc(
   npcScrollOffset = NPC_CONFIG.AHEAD_DISTANCE
 
   const loader = new GLTFLoader()
-  loader.load(NPC_CONFIG.MODEL_PATH, (gltf) => {
+  const modelPath = `${import.meta.env.BASE_URL}models/Soldier.glb`
+  loader.load(modelPath, (gltf) => {
     npcModel = gltf.scene
     npcModel.scale.setScalar(NPC_CONFIG.SCALE)
 
@@ -62,6 +63,8 @@ export function initNpc(
     scene.add(speechSprite)
 
     console.log('[HillRun NPC] Loaded, animations:', Object.keys(actions))
+  }, undefined, (err) => {
+    console.error('[HillRun NPC] Failed to load model:', modelPath, err)
   })
 }
 

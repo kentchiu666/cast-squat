@@ -387,7 +387,7 @@ function gameLoop(timestamp: number) {
 
   tickAccumulator += dt
   let tickCount = 0
-  const MAX_TICKS_PER_FRAME = 3
+  const MAX_TICKS_PER_FRAME = 6
   while (tickAccumulator >= TICK_MS && tickCount < MAX_TICKS_PER_FRAME) {
     try {
       tick()
@@ -620,10 +620,10 @@ body {
 
 #fps {
   position: absolute;
-  bottom: 0.26vw;
-  right: 0.26vw;
+  bottom: 5vw;
+  right: 3vw;
   color: #0f0;
-  font-size: 0.63vw;
+  font-size: 1.25vw;
   font-family: monospace;
   z-index: 100;
 }

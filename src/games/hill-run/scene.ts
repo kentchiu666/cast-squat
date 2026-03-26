@@ -12,6 +12,8 @@ let webglCanvas: HTMLCanvasElement | null = null
 
 // 攝影機平滑用
 let prevCamRoll = 0
+const prevCamPos = new THREE.Vector3()
+let camPosInitialized = false
 
 // WebGL 可用性
 let webglSupported = true
@@ -411,8 +413,14 @@ export function updateSceneCamera(scrollOffset: number): void {
   const lookAt = trackCurve.getPointAt(lookAheadT)
   const tangent = trackCurve.getTangentAt(t)
 
-  // 攝影機位置
-  camera.position.set(pos.x, pos.y + SCENE_CONFIG.CAMERA_HEIGHT, pos.z)
+  // 攝影機位置（lerp 平滑，避免每秒收到資料時抽動）
+  const targetPos = new THREE.Vector3(pos.x, pos.y + SCENE_CONFIG.CAMERA_HEIGHT, pos.z)
+  if (!camPosInitialized) {
+    prevCamPos.copy(targetPos)
+    camPosInitialized = true
+  }
+  prevCamPos.lerp(targetPos, 0.1)
+  camera.position.copy(prevCamPos)
 
   // 上坡/下坡：lookAt y 偏移
   const slope = (lookAt.y - pos.y) / SCENE_CONFIG.CAMERA_LOOK_AHEAD
@@ -454,4 +462,6 @@ export function destroyScene(hostCanvas: HTMLCanvasElement): void {
   trackCurve = null
   trackLength = 0
   prevCamRoll = 0
+  prevCamPos.set(0, 0, 0)
+  camPosInitialized = false
 }
