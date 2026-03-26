@@ -54,6 +54,21 @@ let bubbleTimer = 0
 let bubbleCountdown = 0
 let totalTickCount = 0
 
+// 效能快取：避免每幀重複設定 ctx.font 和 measureText
+let lastNameFontSize = 0
+let lastBubbleFontSize = 0
+const textWidthCache = new Map<string, number>()  // key: `${fontSize}:${text}`
+
+function getCachedTextWidth(ctx: CanvasRenderingContext2D, text: string, fontSize: number): number {
+  const key = `${fontSize}:${text}`
+  let w = textWidthCache.get(key)
+  if (w === undefined) {
+    w = ctx.measureText(text).width
+    textWidthCache.set(key, w)
+  }
+  return w
+}
+
 // === 精靈預渲染 ===
 
 function prerenderSprite(): OffscreenCanvas {
@@ -271,8 +286,11 @@ export function renderNpc(
   const fontSize = Math.max(8, Math.floor(scale * NPC_CONFIG.NAME_FONT_SCALE * 40))
   const nameY = drawY - NPC_CONFIG.NAME_OFFSET_Y * scale
 
-  // 名稱標籤
-  ctx.font = `${fontSize}px "Press Start 2P", cursive`
+  // 名稱標籤（font 快取：只在 fontSize 改變時設定）
+  if (fontSize !== lastNameFontSize) {
+    ctx.font = `${fontSize}px "Press Start 2P", cursive`
+    lastNameFontSize = fontSize
+  }
   ctx.textAlign = 'center'
   ctx.fillStyle = '#000000'
   ctx.fillText(NPC_CONFIG.NAME, screenX + 1, nameY + 1)
@@ -282,8 +300,11 @@ export function renderNpc(
   // 對話氣泡
   if (bubbleText) {
     const bubbleFontSize = Math.max(10, Math.floor(scale * NPC_CONFIG.BUBBLE_FONT_SCALE * 40))
-    ctx.font = `${bubbleFontSize}px "Press Start 2P", cursive`
-    const textWidth = ctx.measureText(bubbleText).width
+    if (bubbleFontSize !== lastBubbleFontSize) {
+      ctx.font = `${bubbleFontSize}px "Press Start 2P", cursive`
+      lastBubbleFontSize = bubbleFontSize
+    }
+    const textWidth = getCachedTextWidth(ctx, bubbleText, bubbleFontSize)
     const pad = NPC_CONFIG.BUBBLE_PADDING * scale * 3
     const bubbleW = textWidth + pad * 2
     const bubbleH = bubbleFontSize + pad * 2
@@ -341,4 +362,7 @@ export function destroyNpc(): void {
   bubbleTimer = 0
   bubbleCountdown = 0
   totalTickCount = 0
+  lastNameFontSize = 0
+  lastBubbleFontSize = 0
+  textWidthCache.clear()
 }

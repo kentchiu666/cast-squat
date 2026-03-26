@@ -264,16 +264,19 @@ function drawMinimap(ctx: CanvasRenderingContext2D, scrollOffset: number, npcScr
 }
 
 function findNearestSample(distance: number): TrackSample | null {
-  let bestIdx = 0
-  let bestDiff = Infinity
-  for (let i = 0; i < trackLUT.length; i++) {
-    const diff = Math.abs(trackLUT[i]!.distance - distance)
-    if (diff < bestDiff) {
-      bestDiff = diff
-      bestIdx = i
-    }
+  if (trackLUT.length === 0) return null
+  // 二分搜尋（trackLUT 已按 distance 遞增排序）— O(log N) 取代 O(N)
+  let lo = 0, hi = trackLUT.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (trackLUT[mid]!.distance < distance) lo = mid + 1
+    else hi = mid
   }
-  return trackLUT[bestIdx] ?? null
+  // 檢查相鄰元素取最近的
+  if (lo > 0 && Math.abs(trackLUT[lo - 1]!.distance - distance) < Math.abs(trackLUT[lo]!.distance - distance)) {
+    lo--
+  }
+  return trackLUT[lo] ?? null
 }
 
 export function destroyRenderer(): void {

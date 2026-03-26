@@ -43,12 +43,13 @@ export function renderMode7Ground(
   const cosA = Math.cos(camAngle)
   const sinA = Math.sin(camAngle)
 
-  // tilemap 中心偏移（世界座標 0,0 對應 tilemap 中心）
+  // 預計算：除法→乘法（每幀省 652,800 次除法）
+  const INV_TILE_SIZE = 1 / TILE_SIZE
   const halfMap = MAP_SIZE / 2
+  // 位掩碼（MAP_SIZE 必須是 2 的冪次）
+  const mapMask = MAP_SIZE - 1
 
   for (let y = 0; y < PHYS_HEIGHT; y++) {
-    // 標準 Mode 7：scale 由 CAMERA_HEIGHT 控制水平展開
-    // forwardDist 由 FOCAL_LENGTH * scale 控制前方可見距離
     const scale = CAMERA_HEIGHT / (y + 1)
     const forwardDist = FOCAL_LENGTH * scale
 
@@ -66,16 +67,11 @@ export function renderMode7Ground(
       const worldX = camX + horizDist * cosA + fwdSin
       const worldZ = camZ + horizDist * sinA - fwdCos
 
-      // 世界座標 → tile 座標
-      const rawTX = Math.floor(worldX / TILE_SIZE) + halfMap
-      const rawTZ = Math.floor(worldZ / TILE_SIZE) + halfMap
+      // 世界座標 → tile 座標（乘法替代除法 + 位掩碼替代邊界檢查）
+      const tx = (Math.floor(worldX * INV_TILE_SIZE) + halfMap) & mapMask
+      const tz = (Math.floor(worldZ * INV_TILE_SIZE) + halfMap) & mapMask
 
-      // 超出 tilemap 範圍 → 草地（不循環重複）
-      if (rawTX < 0 || rawTX >= MAP_SIZE || rawTZ < 0 || rawTZ >= MAP_SIZE) {
-        groundPixels[rowOffset + x] = rowColors[(rawTX + rawTZ) & 1]!
-      } else {
-        groundPixels[rowOffset + x] = rowColors[tilemap[rawTZ * MAP_SIZE + rawTX]!]!
-      }
+      groundPixels[rowOffset + x] = rowColors[tilemap[tz * MAP_SIZE + tx]!]!
     }
   }
 
