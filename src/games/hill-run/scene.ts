@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js'
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js'
 import { SCENE_CONFIG, TRACK_CONFIG, OBJECT_CONFIG } from './constants'
 import { initNpc, destroyNpc } from './npc'
 
@@ -8,6 +10,12 @@ let scene: THREE.Scene | null = null
 let camera: THREE.PerspectiveCamera | null = null
 let trackCurve: THREE.CatmullRomCurve3 | null = null
 let trackLength = 0
+
+// 賽道旁觀眾（跳舞暴風兵）
+const SPECTATOR_COUNT = 200
+const SPECTATOR_ANIM_DISTANCE = 150  // 只更新此距離內的觀眾動畫
+interface SpectatorData { mixer: THREE.AnimationMixer; wrapper: THREE.Group }
+const spectators: SpectatorData[] = []
 let webglCanvas: HTMLCanvasElement | null = null
 
 // 攝影機平滑用
@@ -56,7 +64,7 @@ export function initScene(hostCanvas: HTMLCanvasElement): void {
   scene = new THREE.Scene()
   scene.fog = new THREE.Fog(0xb8d4e8, SCENE_CONFIG.FOG_NEAR, SCENE_CONFIG.FOG_FAR)
 
-  camera = new THREE.PerspectiveCamera(60, 1920 / 1080, 1, 500)
+  camera = new THREE.PerspectiveCamera(60, 1920 / 1080, 1, 1000)
 
   // 光源：HemisphereLight（天空藍+地面綠）+ 暖色 DirectionalLight
   scene.add(new THREE.HemisphereLight(0x8ecae6, 0x4a7c3f, 0.5))
@@ -84,8 +92,10 @@ export function buildTrack(points: TrackPoint3D[]): void {
   trackLength = trackCurve.getLength()
 
   buildRoad(trackCurve)
+  buildRoadSkirt(trackCurve)
   buildTerrain(trackCurve)
   addRoadSideObjects(trackCurve)
+  addSpectators(trackCurve)
 
   // NPC 陪跑者
   if (scene) {
@@ -200,6 +210,71 @@ function buildRoad(curve: THREE.CatmullRomCurve3): void {
 }
 
 // ============================================================
+// 路邊地面條（road skirt）— 從路肩向外延伸，高度完美跟隨賽道
+// ============================================================
+function buildRoadSkirt(curve: THREE.CatmullRomCurve3): void {
+  if (!scene) return
+  const segments = TRACK_CONFIG.ROAD_SEGMENTS
+  const halfRoad = TRACK_CONFIG.ROAD_WIDTH / 2
+  const shoulder = TRACK_CONFIG.SHOULDER_WIDTH
+  const skirtWidth = 40  // 向外延伸寬度
+
+  const verts: number[] = []
+  const colors: number[] = []
+  const idx: number[] = []
+
+  // 每個 segment 左右各 2 個頂點（內側=路肩外緣，外側=skirt 邊緣）
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments
+    const point = curve.getPointAt(t)
+    const tangent = curve.getTangentAt(t).normalize()
+    const right = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize()
+
+    const roadY = point.y + 0.1
+
+    // 左側：內 → 外
+    const lInner = point.clone().add(right.clone().multiplyScalar(-(halfRoad + shoulder)))
+    const lOuter = point.clone().add(right.clone().multiplyScalar(-(halfRoad + shoulder + skirtWidth)))
+    // 右側：內 → 外
+    const rInner = point.clone().add(right.clone().multiplyScalar(halfRoad + shoulder))
+    const rOuter = point.clone().add(right.clone().multiplyScalar(halfRoad + shoulder + skirtWidth))
+
+    const base = i * 4
+    // 0=左內, 1=左外, 2=右內, 3=右外
+    verts.push(lInner.x, roadY, lInner.z)
+    verts.push(lOuter.x, roadY - 1, lOuter.z)  // 外側稍低，自然過渡
+    verts.push(rInner.x, roadY, rInner.z)
+    verts.push(rOuter.x, roadY - 1, rOuter.z)
+
+    // 顏色：內側深綠 → 外側淺綠
+    colors.push(0.25, 0.5, 0.15)  // 左內
+    colors.push(0.3, 0.45, 0.2)   // 左外
+    colors.push(0.25, 0.5, 0.15)  // 右內
+    colors.push(0.3, 0.45, 0.2)   // 右外
+
+    if (i > 0) {
+      const prev = (i - 1) * 4
+      // 左側 strip
+      idx.push(prev, prev + 1, base, prev + 1, base + 1, base)
+      // 右側 strip
+      idx.push(prev + 2, prev + 3, base + 2, prev + 3, base + 3, base + 2)
+    }
+  }
+
+  // 封閉
+  const last = segments * 4
+  idx.push(last, last + 1, 0, last + 1, 1, 0)
+  idx.push(last + 2, last + 3, 2, last + 3, 3, 2)
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  geo.setIndex(idx)
+  geo.computeVertexNormals()
+  scene.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true })))
+}
+
+// ============================================================
 // 地形（跟隨道路高度起伏 + vertex color）
 // ============================================================
 function buildTerrain(curve: THREE.CatmullRomCurve3): void {
@@ -215,7 +290,7 @@ function buildTerrain(curve: THREE.CatmullRomCurve3): void {
 
   // 預取賽道取樣點（用於快速最近點查詢）
   const trackSamples: THREE.Vector3[] = []
-  const sampleCount = 200
+  const sampleCount = 300
   for (let i = 0; i < sampleCount; i++) {
     trackSamples.push(curve.getPointAt(i / sampleCount))
   }
@@ -239,12 +314,14 @@ function buildTerrain(curve: THREE.CatmullRomCurve3): void {
     const dist = Math.sqrt(minDist)
 
     // 地面高度：近路跟隨賽道，遠處漸變到 0
-    const trackInfluence = Math.max(0, 1 - dist / 150)
-    const baseY = nearestY * trackInfluence - 0.5
+    // 使用平方衰減讓近路區域更緊貼
+    const t2 = Math.max(0, 1 - dist / 300)
+    const trackInfluence = t2 * t2
+    const baseY = nearestY * trackInfluence - 0.2
     pos.setY(i, baseY)
 
     // 顏色：近路深綠 → 遠處淺綠偏褐
-    const colorBlend = Math.min(1, dist / 200)
+    const colorBlend = Math.min(1, dist / 400)
     colors[i * 3] = 0.25 + colorBlend * 0.2     // R
     colors[i * 3 + 1] = 0.5 - colorBlend * 0.1  // G
     colors[i * 3 + 2] = 0.15 + colorBlend * 0.1 // B
@@ -302,7 +379,7 @@ function buildClouds(): void {
 
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2
-    const radius = 100 + Math.random() * 200
+    const radius = 200 + Math.random() * 400
     dummy.position.set(
       Math.cos(angle) * radius,
       SCENE_CONFIG.CLOUD_HEIGHT + Math.random() * 30,
@@ -339,10 +416,13 @@ function addRoadSideObjects(curve: THREE.CatmullRomCurve3): void {
 
       for (const side of [-1, 1]) {
         if (positions.length >= count) break
-        const offset = (halfRoad + offsetMin + Math.random() * (offsetMax - offsetMin)) * side
+        const dist = halfRoad + offsetMin + Math.random() * (offsetMax - offsetMin)
+        const offset = dist * side
         const pos = point.clone().add(right.clone().multiplyScalar(offset))
+        // 離路越遠，高度越低（跟 road skirt 的斜率一致）
+        const yDrop = Math.max(0, (dist - halfRoad - TRACK_CONFIG.SHOULDER_WIDTH)) / 40
         positions.push({
-          x: pos.x, y: pos.y, z: pos.z,
+          x: pos.x, y: pos.y - yDrop, z: pos.z,
           sx: 0.7 + Math.random() * 0.6,
           sy: 0.7 + Math.random() * 0.5,
         })
@@ -400,6 +480,110 @@ function addRoadSideObjects(curve: THREE.CatmullRomCurve3): void {
 }
 
 // ============================================================
+// 動畫 UUID 重新對應（clone 後節點 UUID 不同）
+// ============================================================
+function retargetClips(
+  source: THREE.Object3D,
+  target: THREE.Object3D,
+  clips: THREE.AnimationClip[],
+): THREE.AnimationClip[] {
+  // 收集來源和目標的節點（traverse 順序一致）
+  const srcNodes: THREE.Object3D[] = []
+  const tgtNodes: THREE.Object3D[] = []
+  source.traverse((n) => srcNodes.push(n))
+  target.traverse((n) => tgtNodes.push(n))
+
+  // 建立 UUID 對應表：source UUID → target UUID
+  const uuidMap = new Map<string, string>()
+  for (let i = 0; i < srcNodes.length && i < tgtNodes.length; i++) {
+    uuidMap.set(srcNodes[i]!.uuid, tgtNodes[i]!.uuid)
+  }
+
+  return clips.map((clip) => {
+    const newClip = clip.clone()
+    for (const track of newClip.tracks) {
+      const dotIdx = track.name.indexOf('.')
+      if (dotIdx < 0) continue
+      const oldUuid = track.name.substring(0, dotIdx)
+      const prop = track.name.substring(dotIdx)
+      const newUuid = uuidMap.get(oldUuid)
+      if (newUuid) {
+        track.name = newUuid + prop
+      }
+    }
+    return newClip
+  })
+}
+
+// ============================================================
+// 賽道旁觀眾（跳舞暴風兵）
+// ============================================================
+function addSpectators(curve: THREE.CatmullRomCurve3): void {
+  if (!scene) return
+  const loader = new ColladaLoader()
+  const modelPath = `${import.meta.env.BASE_URL}models/stormtrooper/stormtrooper.dae`
+
+  loader.load(modelPath, (collada) => {
+    if (!scene || !collada) return
+    const baseModel = collada.scene
+    // ColladaLoader 的動畫可能在 scene.animations 或子物件上
+    let animations = baseModel.animations
+    if (!animations || animations.length === 0) {
+      // 搜尋子物件的動畫
+      baseModel.traverse((child: THREE.Object3D) => {
+        if (child.animations && child.animations.length > 0) {
+          animations = child.animations
+        }
+      })
+    }
+    console.warn('[HillRun Spectators] Model loaded, animations:', animations?.length ?? 0, 'children:', baseModel.children.length)
+
+    const halfRoad = TRACK_CONFIG.ROAD_WIDTH / 2
+
+    for (let i = 0; i < SPECTATOR_COUNT; i++) {
+      const t = i / SPECTATOR_COUNT
+      const point = curve.getPointAt(t)
+      const tangent = curve.getTangentAt(t).normalize()
+      const right = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize()
+
+      // 隨機選一側，距離路邊 3~6 單位
+      const side = Math.random() < 0.5 ? -1 : 1
+      const offset = halfRoad + 3 + Math.random() * 3
+      const pos = point.clone().add(right.clone().multiplyScalar(offset * side))
+
+      // wrapper 負責定位和朝向，clone 負責修正 Z-UP 旋轉
+      const wrapper = new THREE.Group()
+      wrapper.position.set(pos.x, pos.y, pos.z)
+      wrapper.lookAt(point.x, pos.y, point.z)
+      // lookAt 讓 -Z 朝向目標，但模型正面是 +Z，旋轉 180 度修正
+      wrapper.rotateY(Math.PI)
+
+      const clone = SkeletonUtils.clone(baseModel)
+      clone.rotation.x = -Math.PI / 2
+      clone.scale.setScalar(1.2)
+      wrapper.add(clone)
+
+      scene.add(wrapper)
+
+      // 每個暴風兵獨立的 AnimationMixer（動畫錯開）
+      if (animations && animations.length > 0) {
+        // clone 後 UUID 不同，需要重新對應動畫 track
+        const remappedClips = retargetClips(baseModel, clone, animations)
+        const mixer = new THREE.AnimationMixer(clone)
+        const action = mixer.clipAction(remappedClips[0]!)
+        action.play()
+        action.time = Math.random() * (remappedClips[0]!.duration)
+        spectators.push({ mixer, wrapper })
+      }
+    }
+
+    console.log(`[HillRun] ${SPECTATOR_COUNT} spectators placed`)
+  }, undefined, (err) => {
+    console.error('[HillRun] Failed to load spectator model:', err)
+  })
+}
+
+// ============================================================
 // 公開 API
 // ============================================================
 export function getTrackLength(): number { return trackLength }
@@ -443,8 +627,24 @@ export function updateSceneCamera(scrollOffset: number): void {
   camera.up.set(Math.sin(prevCamRoll), Math.cos(prevCamRoll), 0)
 }
 
+let lastRenderTime = 0
 export function renderFrame(): void {
   if (!renderer || !scene || !camera) return
+  // 更新攝影機附近的觀眾動畫（遠處跳過，節省效能）
+  const now = performance.now()
+  if (lastRenderTime > 0 && camera) {
+    const delta = (now - lastRenderTime) / 1000
+    const camPos = camera.position
+    const distSq = SPECTATOR_ANIM_DISTANCE * SPECTATOR_ANIM_DISTANCE
+    for (const s of spectators) {
+      const dx = s.wrapper.position.x - camPos.x
+      const dz = s.wrapper.position.z - camPos.z
+      if (dx * dx + dz * dz < distSq) {
+        s.mixer.update(delta)
+      }
+    }
+  }
+  lastRenderTime = now
   renderer.render(scene, camera)
 }
 
@@ -470,4 +670,10 @@ export function destroyScene(hostCanvas: HTMLCanvasElement): void {
   prevCamRoll = 0
   prevCamPos.set(0, 0, 0)
   camPosInitialized = false
+  // 清理觀眾動畫
+  for (const s of spectators) {
+    s.mixer.stopAllAction()
+  }
+  spectators.length = 0
+  lastRenderTime = 0
 }

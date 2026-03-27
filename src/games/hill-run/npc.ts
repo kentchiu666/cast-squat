@@ -1,5 +1,5 @@
 // Hill Run 3D NPC 陪跑者
-// 使用 Three.js 官方 Soldier.glb（含 Idle/Walk/Run 動畫）
+// 使用 Three.js 官方 RobotExpressive.glb（含 Walking/Running/Dance 等 13 種動畫）
 
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
@@ -36,7 +36,7 @@ export function initNpc(
   npcScrollOffset = NPC_CONFIG.AHEAD_DISTANCE
 
   const loader = new GLTFLoader()
-  const modelPath = `${import.meta.env.BASE_URL}models/Soldier.glb`
+  const modelPath = `${import.meta.env.BASE_URL}models/RobotExpressive.glb`
   loader.load(modelPath, (gltf) => {
     npcModel = gltf.scene
     npcModel.scale.setScalar(NPC_CONFIG.SCALE)
@@ -53,17 +53,22 @@ export function initNpc(
     for (const clip of gltf.animations) {
       const action = mixer.clipAction(clip)
       actions[clip.name] = action
+      // Emote 類動畫設定為只播一次
+      if (['Jump', 'Yes', 'No', 'Wave', 'Punch', 'ThumbsUp'].includes(clip.name)) {
+        action.clampWhenFinished = true
+        action.loop = THREE.LoopOnce
+      }
     }
 
-    // 預設播放 Run
-    playAction('Run')
+    // 預設播放 Running
+    playAction('Running')
 
     // 建立加油文字氣泡（頭頂上方）
     speechSprite = createSpeechSprite()
     speechSprite.visible = false
     scene.add(speechSprite)
 
-    console.log('[HillRun NPC] Loaded, animations:', Object.keys(actions))
+    console.log('[HillRun NPC] RobotExpressive loaded, animations:', Object.keys(actions))
   }, undefined, (err) => {
     console.error('[HillRun NPC] Failed to load model:', modelPath, err)
   })
@@ -148,21 +153,25 @@ export function updateNpc(playerScrollOffset: number, playerSpeed: number, delta
 
   npcModel.position.set(pos.x, pos.y + NPC_CONFIG.Y_OFFSET, pos.z)
 
-  // 面向前進方向（Soldier 模型面朝 -Z，需反轉切線）
+  // 面向前進方向（RobotExpressive 面朝 +Z，沿切線方向看）
   _lookTarget.set(
-    pos.x - tangent.x * 10,
+    pos.x + tangent.x * 10,
     pos.y + NPC_CONFIG.Y_OFFSET,
-    pos.z - tangent.z * 10,
+    pos.z + tangent.z * 10,
   )
   npcModel.lookAt(_lookTarget)
 
-  // 動畫切換：根據玩家速度
-  if (playerSpeed < 0.05) {
-    playAction('Idle')
+  // 動畫切換：
+  //   玩家停下來 → Dance
+  //   玩家走路 → Walking
+  //   玩家跑步 → Running
+  //   加油文字顯示中 → 維持 Running（不切換到 Dance）
+  if (playerSpeed < 0.05 && !speechVisible) {
+    playAction('Dance')
   } else if (playerSpeed < 0.4) {
-    playAction('Walk')
+    playAction('Walking')
   } else {
-    playAction('Run')
+    playAction('Running')
   }
 
   // 更新動畫混合器

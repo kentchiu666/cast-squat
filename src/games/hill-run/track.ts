@@ -21,7 +21,7 @@ export function generateTrack3D(seed?: number): TrackPoint3D[] {
   for (let i = 0; i < NUM_POINTS; i++) {
     const baseAngle = (i / NUM_POINTS) * Math.PI * 2
     const angle = baseAngle + (rng() - 0.5) * 0.3
-    const radius = BASE_RADIUS + (rng() - 0.5) * 60
+    const radius = BASE_RADIUS + (rng() - 0.5) * 120
 
     const x = Math.cos(angle) * radius
     const z = Math.sin(angle) * radius

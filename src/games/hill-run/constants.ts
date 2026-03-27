@@ -16,55 +16,54 @@ export const CADENCE_CONFIG = {
 
 // === 賽道配置 ===
 export const TRACK_CONFIG = {
-  NUM_POINTS: 12,
-  BASE_RADIUS: 200,
+  NUM_POINTS: 16,
+  BASE_RADIUS: 400,
   ROAD_WIDTH: 12,
   SHOULDER_WIDTH: 3,
-  ROAD_SEGMENTS: 120,
-  HILL_AMPLITUDE: 18,
+  ROAD_SEGMENTS: 200,
+  HILL_AMPLITUDE: 24,
   HILL_FREQUENCY_1: 2,
   HILL_FREQUENCY_2: 3.7,
-  HILL_RANDOM_JITTER: 6,
+  HILL_RANDOM_JITTER: 8,
 } as const
 
 // === 3D 場景配置 ===
 export const SCENE_CONFIG = {
   CAMERA_HEIGHT: 4,
   CAMERA_LOOK_AHEAD: 25,
-  FOG_NEAR: 100,
-  FOG_FAR: 300,
+  FOG_NEAR: 200,
+  FOG_FAR: 600,
   RENDER_SCALE: 0.5,
-  GROUND_SIZE: 800,
-  GROUND_SEGMENTS: 63,
-  SKY_RADIUS: 400,
-  CLOUD_COUNT: 8,
-  CLOUD_HEIGHT: 80,
+  GROUND_SIZE: 1600,
+  GROUND_SEGMENTS: 160,
+  SKY_RADIUS: 800,
+  CLOUD_COUNT: 16,
+  CLOUD_HEIGHT: 100,
   PREVIEW_SCROLL_SPEED: 0.3,  // START_SCREEN 環繞預覽速度
 } as const
 
 // === 路邊物件配置 ===
 export const OBJECT_CONFIG = {
-  PINE_TREE_COUNT: 15,
-  BROAD_TREE_COUNT: 10,
-  BUSH_COUNT: 20,
-  ROCK_COUNT: 12,
-  FLOWER_COUNT: 15,
+  PINE_TREE_COUNT: 30,
+  BROAD_TREE_COUNT: 20,
+  BUSH_COUNT: 40,
+  ROCK_COUNT: 24,
+  FLOWER_COUNT: 30,
   NEAR_OFFSET_MIN: 8,
   NEAR_OFFSET_MAX: 15,
   MID_OFFSET_MIN: 15,
-  MID_OFFSET_MAX: 25,
-  FAR_OFFSET_MIN: 25,
-  FAR_OFFSET_MAX: 40,
+  MID_OFFSET_MAX: 30,
+  FAR_OFFSET_MIN: 30,
+  FAR_OFFSET_MAX: 60,
 } as const
 
 // === NPC 陪跑配置 ===
 export const NPC_CONFIG = {
-  MODEL_PATH: '/models/Soldier.glb',
-  SCALE: 2,
+  SCALE: 1,
   AHEAD_DISTANCE: 30,         // NPC 在玩家前方多遠
   RUBBER_BAND_SPEED: 0.03,    // 橡皮筋回彈速度
   BASE_SPEED: 0.15,           // NPC 基礎速度
-  Y_OFFSET: 0.5,              // 模型 Y 偏移（腳底貼地）
+  Y_OFFSET: 0,                // 模型 Y 偏移（腳底貼地）
 } as const
 
 // === 遊戲設定 ===

@@ -18,6 +18,7 @@ This file provides guidance to Claude Code when working with this repository.
 - **深蹲跳躍遊戲**：20 秒計時 / 7 階段跳躍動畫 / 金幣收集 / 多人模式（最多 4 人）
 - **搖搖樂遊戲**：盲玩模式 / sin 曲線搖晃動畫 / RESULT_PENDING 結果收集 / 多人模式（最多 8 人）
 - **虛擬跑步遊戲（Demo）**：YouTube 影片背景 / 手機加速度計計步 / 距離累積 / 單人模式
+- **山丘跑步遊戲**：Three.js 3D 場景 / 隨機賽道（高度起伏）/ RobotExpressive NPC 陪跑 / 300 隻跳舞暴風兵觀眾 / 步頻驅動 / 單人模式
 - **多人等候室**：START_SCREEN 顯示已加入玩家（角色預覽 + 名稱）
 - **排行榜**：遊戲結束顯示玩家排名
 - 支援本地瀏覽器測試與 Google Cast 部署
@@ -92,6 +93,21 @@ cast-squat/
 │           │   ├── sky.ts              # 天空漸層 + 遠山（offscreen 預渲染）
 │           │   └── light-rays.ts       # 林間漏光效果
 │           └── __tests__/              # 單元測試
+│       └── hill-run/                   # 山丘跑步遊戲模組（Three.js 3D）
+│           ├── index.ts                # GameModule 實作（步頻驅動、攝影機跟隨賽道）
+│           ├── ui-state.ts             # Vue reactive 狀態物件
+│           ├── HillRunUI.vue           # 遊戲 UI 元件（HUD + 倒數 + GAME_OVER）
+│           ├── constants.ts            # 賽道、場景、NPC、步頻等常數
+│           ├── cadence.ts              # 步頻→速度映射、lerp
+│           ├── track.ts                # Seeded PRNG 隨機賽道生成（3D 控制點 + 高度起伏）
+│           ├── scene.ts                # Three.js 場景管理（道路、地形、天空、雲、路邊物件、觀眾）
+│           └── npc.ts                  # NPC 陪跑者（RobotExpressive.glb，Walking/Running/Dance）
+├── public/
+│   └── models/
+│       ├── RobotExpressive.glb         # NPC 機器人模型（CC0，13 種動畫）
+│       └── stormtrooper/              # 觀眾暴風兵模型（CC Attribution）
+│           ├── stormtrooper.dae        # Collada 骨骼動畫模型
+│           └── Stormtrooper_D.jpg      # 材質貼圖
 ├── kenney_shape-characters/            # Kenney 免費角色素材包
 │   └── Spritesheet/
 │       ├── spritesheet_default.png
@@ -105,6 +121,7 @@ cast-squat/
 - **TypeScript** - 全專案型別安全
 - **Vite** - 建置工具 + HMR 開發伺服器
 - **HTML5 Canvas** - 遊戲圖形渲染（精靈、粒子、背景）
+- **Three.js** - Hill Run 3D 場景渲染（WebGLRenderer、CatmullRomCurve3、GLTFLoader、ColladaLoader、SkeletonUtils）
 - **Vue 元件** - 所有遊戲文字 UI（分數、倒數、排行榜）透過 reactive state + scoped CSS 管理
 - **Google Cast Web Receiver SDK** - Cast 整合
 - **Press Start 2P Font** - 像素藝術字體（Google Fonts）
@@ -282,6 +299,21 @@ gameLoop(timestamp)
 | `courses/themes/jungle.ts` | 叢林風格（天空、地面、道路、精靈顏色、霧效） |
 
 > **特殊性**：使用真正的 Mode 7 tilemap 透視投影渲染（仿 Mario Kart SNES），封閉迴圈賽道可繞建築物。賽道形狀（TrackDef）和視覺風格（ThemeDef）獨立模組化，可自由組合。每次開始遊戲自動生成隨機賽道，增加重玩性。手機傳步頻驅動場景速度。
+
+#### Hill Run 遊戲模組（Three.js 3D）
+
+| 模組 | 職責 |
+|------|------|
+| `index.ts` | GameModule 實作、步頻驅動、攝影機跟隨、倒數 3-2-1-GO! |
+| `ui-state.ts` | Vue reactive 狀態物件（距離、步數、圈數、倒數） |
+| `HillRunUI.vue` | 遊戲 UI 元件（START_SCREEN、HUD、倒數動畫、GAME_OVER） |
+| `constants.ts` | 賽道（BASE_RADIUS=400）、場景、NPC、步頻等常數 |
+| `cadence.ts` | 步頻→速度映射、lerp 平滑 |
+| `track.ts` | Seeded PRNG 隨機 3D 賽道生成（16 控制點 + 高度起伏） |
+| `scene.ts` | Three.js 場景管理（道路、地形、天空穹頂、雲、路邊物件、300 隻觀眾） |
+| `npc.ts` | NPC 陪跑者（RobotExpressive.glb，Running/Walking/Dance 切換） |
+
+> **特殊性**：使用 Three.js WebGLRenderer 全 3D 渲染（CatmullRomCurve3 封閉賽道），支援真實高度起伏。每次開始遊戲自動生成隨機賽道。NPC 使用 RobotExpressive 機器人模型（13 種動畫），玩家停下時跳 Dance。賽道兩側放置 300 隻跳舞暴風兵觀眾（ColladaLoader + SkeletonUtils.clone + 動畫 UUID 重新對應）。START_SCREEN 攝影機自動環繞預覽賽道。RENDER_SCALE=0.5 + powerPreference='low-power' 優化機上盒效能。
 
 ### Cast Integration
 - **Application ID**: `DD35BB50`
