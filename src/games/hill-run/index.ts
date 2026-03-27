@@ -1,9 +1,9 @@
 import type { GameContext } from '../shared/types'
 import { createGameModule } from '../shared/create-game-module'
 import { uiState, resetUIState } from './ui-state'
-import { GAME_CONFIG, CADENCE_CONFIG } from './constants'
+import { GAME_CONFIG, CADENCE_CONFIG, SCENE_CONFIG } from './constants'
 import { cadenceToSpeed, lerp } from './cadence'
-import { initScene, buildTrack, updateSceneCamera, renderFrame, destroyScene, getTrackLength, isWebGLSupported } from './scene'
+import { initScene, buildTrack, updateSceneCamera, resetCameraLerp, renderFrame, destroyScene, getTrackLength, isWebGLSupported } from './scene'
 import { updateNpc } from './npc'
 import { generateTrack3D } from './track'
 import HillRunUI from './HillRunUI.vue'
@@ -41,17 +41,8 @@ const createState = (): HillRunState => ({
 })
 
 // === 開始遊戲 ===
-function startGame(ctx: GameContext<HillRunState>): void {
-  Object.assign(ctx.state, createState())
-
-  uiState.distance = 0
-  uiState.steps = 0
-  uiState.cadence = 0
-  uiState.elapsedTime = 0
-  uiState.isRunning = false
-
-  ctx.changeState('PLAYING')
-}
+// startGame 不再需要 — 倒數由 createGameModule 的 countdown config 自動管理
+// onBeforeCountdown 負責重置狀態，倒數結束自動進入 PLAYING
 
 // === 結束遊戲 ===
 function endGame(ctx: GameContext<HillRunState>): void {
@@ -92,6 +83,22 @@ export default createGameModule<HillRunState>({
     GAME_OVER: 'RUN AGAIN',
   },
 
+  countdown: {
+    gameDuration: 0,  // 無時間限制
+    onBeforeCountdown(ctx) {
+      Object.assign(ctx.state, createState())
+      resetCameraLerp()
+      // 只重置遊戲數據，不呼叫 resetUIState()（會清掉 onAction 回調）
+      uiState.distance = 0
+      uiState.steps = 0
+      uiState.cadence = 0
+      uiState.elapsedTime = 0
+      uiState.isRunning = false
+      uiState.lap = 1
+      uiState.lapProgress = 0
+    },
+  },
+
   onInit(_ctx, canvas) {
     hostCanvasRef = canvas
     initScene(canvas)
@@ -108,9 +115,6 @@ export default createGameModule<HillRunState>({
   onAction(ctx) {
     const gs = ctx.getGameState()
     switch (gs) {
-      case 'START_SCREEN':
-        startGame(ctx)
-        break
       case 'PLAYING': {
         // 本地測試：切換走路/跑步
         const isCurrentlyRunning = ctx.state.cadence >= CADENCE_CONFIG.RUN_THRESHOLD
@@ -130,13 +134,16 @@ export default createGameModule<HillRunState>({
         break
       }
       case 'GAME_OVER':
-        // 重新開始：重建場景（新賽道）
+        // 重新開始：重建場景（新賽道）→ 回到 START_SCREEN 讓倒數流程再跑一次
         if (hostCanvasRef) {
           destroyScene(hostCanvasRef)
           initScene(hostCanvasRef)
           buildTrack(generateTrack3D())
         }
-        startGame(ctx)
+        Object.assign(ctx.state, createState())
+        resetCameraLerp()
+        resetUIState()
+        ctx.changeState('START_SCREEN')
         break
     }
   },
@@ -177,6 +184,12 @@ export default createGameModule<HillRunState>({
   },
 
   onTick(ctx) {
+    // START_SCREEN：攝影機沿賽道慢慢環繞，預覽地圖
+    if (ctx.getGameState() === 'START_SCREEN') {
+      ctx.state.scrollOffset += SCENE_CONFIG.PREVIEW_SCROLL_SPEED
+      updateSceneCamera(ctx.state.scrollOffset)
+    }
+
     if (ctx.getGameState() === 'PLAYING') {
       ctx.state.totalTicks++
 

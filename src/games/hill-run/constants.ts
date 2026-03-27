@@ -39,6 +39,7 @@ export const SCENE_CONFIG = {
   SKY_RADIUS: 400,
   CLOUD_COUNT: 8,
   CLOUD_HEIGHT: 80,
+  PREVIEW_SCROLL_SPEED: 0.3,  // START_SCREEN 環繞預覽速度
 } as const
 
 // === 路邊物件配置 ===

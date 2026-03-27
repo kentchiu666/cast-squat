@@ -22,6 +22,11 @@ export const uiState = reactive({
   onAction: null as (() => void) | null,
   // WebGL
   webglFailed: false,
+  // 倒數（由 createGameModule 自動寫入）
+  countdownText: '',
+  countdownColor: '',
+  countdownFontSize: '',
+  countdownKey: 0,
 })
 
 export function resetUIState(): void {
@@ -39,4 +44,8 @@ export function resetUIState(): void {
   uiState.actionButtonText = 'START RUN'
   uiState.onAction = null
   uiState.webglFailed = false
+  uiState.countdownText = ''
+  uiState.countdownColor = ''
+  uiState.countdownFontSize = ''
+  uiState.countdownKey = 0
 }

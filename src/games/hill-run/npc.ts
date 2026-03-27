@@ -20,6 +20,7 @@ let speechTimer = 0
 let speechVisible = false
 const SPEECH_INTERVAL = 300  // 每 300 tick 顯示一次（約 5 秒）
 const SPEECH_DURATION = 120  // 顯示 120 tick（約 2 秒）
+const _lookTarget = new THREE.Vector3()  // 可復用，避免每幀 GC
 const SPEECH_MESSAGES = ['加油！', 'Go! Go!', '繼續跑！', 'Keep it up!', '你可以的！', 'Nice pace!']
 
 // === 初始化 NPC（載入模型 + 動畫）===
@@ -148,12 +149,12 @@ export function updateNpc(playerScrollOffset: number, playerSpeed: number, delta
   npcModel.position.set(pos.x, pos.y + NPC_CONFIG.Y_OFFSET, pos.z)
 
   // 面向前進方向（Soldier 模型面朝 -Z，需反轉切線）
-  const lookTarget = new THREE.Vector3(
+  _lookTarget.set(
     pos.x - tangent.x * 10,
     pos.y + NPC_CONFIG.Y_OFFSET,
     pos.z - tangent.z * 10,
   )
-  npcModel.lookAt(lookTarget)
+  npcModel.lookAt(_lookTarget)
 
   // 動畫切換：根據玩家速度
   if (playerSpeed < 0.05) {

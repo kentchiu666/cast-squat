@@ -36,6 +36,18 @@ const formattedFinalTime = computed(() => {
       </div>
     </div>
 
+    <!-- 倒數動畫 3-2-1-GO! -->
+    <Transition name="hill-countdown-pop" appear>
+      <div
+        v-if="state.countdownText"
+        :key="state.countdownKey"
+        class="hill-countdown-num"
+        :style="{ color: state.countdownColor, fontSize: state.countdownFontSize }"
+      >
+        {{ state.countdownText }}
+      </div>
+    </Transition>
+
     <!-- HUD（遊戲中）-->
     <div v-show="state.gameState === 'PLAYING'" class="hill-hud">
       <div class="hill-hud-left">
@@ -165,6 +177,28 @@ const formattedFinalTime = computed(() => {
 .hill-final-stats {
   font-size: 0.7vw;
   color: #aaa;
+}
+
+/* 倒數動畫 */
+.hill-countdown-num {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 6.25vw;
+  font-family: 'Press Start 2P', cursive;
+  z-index: 10;
+  text-shadow: 0.3vw 0.3vw 0 rgba(0,0,0,0.5);
+}
+.hill-countdown-pop-enter-active {
+  animation: hillCountdownPop 1s ease-out forwards;
+}
+@keyframes hillCountdownPop {
+  0% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
+  60% { transform: translate(-50%, -50%) scale(0.97); opacity: 1; }
+  75% { transform: translate(-50%, -50%) scale(1.02); opacity: 1; }
+  85% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
 }
 
 /* 操作按鈕 */

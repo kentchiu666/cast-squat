@@ -13,6 +13,7 @@ let webglCanvas: HTMLCanvasElement | null = null
 // 攝影機平滑用
 let prevCamRoll = 0
 const prevCamPos = new THREE.Vector3()
+const _targetPos = new THREE.Vector3()  // 可復用，避免每幀 GC
 let camPosInitialized = false
 
 // WebGL 可用性
@@ -403,6 +404,11 @@ function addRoadSideObjects(curve: THREE.CatmullRomCurve3): void {
 // ============================================================
 export function getTrackLength(): number { return trackLength }
 
+export function resetCameraLerp(): void {
+  camPosInitialized = false
+  prevCamRoll = 0
+}
+
 export function updateSceneCamera(scrollOffset: number): void {
   if (!camera || !trackCurve || trackLength <= 0) return
 
@@ -414,12 +420,12 @@ export function updateSceneCamera(scrollOffset: number): void {
   const tangent = trackCurve.getTangentAt(t)
 
   // 攝影機位置（lerp 平滑，避免每秒收到資料時抽動）
-  const targetPos = new THREE.Vector3(pos.x, pos.y + SCENE_CONFIG.CAMERA_HEIGHT, pos.z)
+  _targetPos.set(pos.x, pos.y + SCENE_CONFIG.CAMERA_HEIGHT, pos.z)
   if (!camPosInitialized) {
-    prevCamPos.copy(targetPos)
+    prevCamPos.copy(_targetPos)
     camPosInitialized = true
   }
-  prevCamPos.lerp(targetPos, 0.1)
+  prevCamPos.lerp(_targetPos, 0.1)
   camera.position.copy(prevCamPos)
 
   // 上坡/下坡：lookAt y 偏移
